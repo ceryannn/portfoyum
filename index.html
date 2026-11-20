@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portföyüm</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1419">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Portföyüm">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<style>
+  :root {
+    --bg: #0f1419; --panel: #182029; --panel2: #1f2933; --line: #2b3640;
+    --text: #e6edf3; --muted: #8b98a5; --accent: #4c9ffe;
+    --green: #2ecc71; --red: #ff5c5c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 1150px; margin: 0 auto; padding: 24px 20px 60px; }
+  header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  h1 { margin: 0; font-size: 24px; font-weight: 600; }
+  .status { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button, select, input { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.small { padding: 4px 9px; font-size: 13px; }
+  button.danger:hover { border-color: var(--red); color: var(--red); }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .card .label { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+  .card .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .card .sub { font-size: 14px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 22px; }
+  .panel h2 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+  form.add { display: grid; grid-template-columns: 2fr 1fr 1fr 0.8fr 1fr auto; gap: 10px; align-items: end; }
+  form.add label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  form.add input, form.add select { width: 100%; }
+  .coin-field { position: relative; }
+  .suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; margin-top: 4px; max-height: 260px; overflow-y: auto; display: none; }
+  .suggest div { padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  .suggest div:hover, .suggest div.active { background: var(--line); }
+  .suggest .sym { color: var(--muted); font-size: 13px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 13px; }
+  th:first-child, td:first-child { text-align: left; }
+  td .sym { color: var(--muted); font-size: 12px; margin-left: 4px; }
+  tr.coin-row { cursor: pointer; }
+  tr.coin-row:hover td { background: rgba(255,255,255,0.02); }
+  tr.lot td { font-size: 13px; color: var(--muted); background: rgba(0,0,0,0.15); }
+  tr.lot td:first-child { padding-left: 28px; }
+  .pos { color: var(--green); } .neg { color: var(--red); }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+  .arrow { display: inline-block; width: 14px; color: var(--muted); }
+  .manual { color: #f5b041; font-size: 11px; margin-left: 4px; }
+  .footer { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 13px; }
+  .footer .grow { flex: 1; }
+  .table-wrap { overflow-x: auto; }
+  .hold th, .hold td { padding: 9px 6px; }
+  .hold td { font-size: 14px; }
+  .hold th:first-child, .hold td:first-child { text-align: left; padding-left: 4px; }
+  .hold .acts { white-space: nowrap; text-align: right; padding-right: 2px; }
+  @media (max-width: 1100px) { .hold .cn { display: none; } .hold td .sym { margin-left: 0; color: var(--text); font-size: 14px; font-weight: 600; } .hold th, .hold td { padding: 8px 5px; } }
+  .hold .acts button { padding: 3px 6px; font-size: 13px; line-height: 1; margin-left: 2px; }
+
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: 380px; }
+  dialog::backdrop { background: rgba(0,0,0,0.6); }
+  dialog label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  dialog input, dialog select { width: 100%; }
+  dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+  .realized { display: flex; gap: 6px; }
+  .realized input { flex: 1; min-width: 0; font-size: 18px; font-weight: 600; padding: 4px 8px; }
+  .realized select { padding: 4px 6px; }
+  .sub-tag { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .merge-text { font-size: 14px; line-height: 1.6; color: var(--text); }
+  #mergeDlg { width: 440px; }
+  .merge-row { flex-wrap: wrap; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .sync { color: var(--green); margin-left: 6px; }
+  .sync.bad { color: var(--red); }
+  .card.changes { grid-column: 1 / -1; }
+  .chg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 4px; }
+  .chg-box { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-variant-numeric: tabular-nums; }
+  .chg-box .k { color: var(--muted); font-size: 12px; }
+  .chg-box .a { font-size: 17px; font-weight: 600; margin-top: 4px; }
+  .chg-box .p { font-size: 13px; margin-top: 2px; }
+  .chg-note { font-size: 11px; margin-top: 8px; }
+  .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chart-head h2 { margin: 0; }
+  .range { display: flex; gap: 4px; flex-wrap: wrap; }
+  .range button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  .legend .sw { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 6px; }
+  .sw-v { border-color: var(--accent) !important; }
+  .sw-g { border-color: var(--green) !important; }
+  .sw-r { border-color: var(--red) !important; }
+  .sw-c { border-color: #8b98a5 !important; border-top-style: dashed !important; }
+  .chart { position: relative; height: 280px; }
+  .chart svg { display: block; width: 100%; height: 100%; }
+  .chart-from { position: absolute; right: 16px; top: 4px; font-size: 11px; color: var(--muted); background: var(--panel); padding: 2px 6px; border-radius: 6px; }
+  .chart-empty { padding: 110px 0; text-align: center; }
+  .tip { position: absolute; pointer-events: none; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; white-space: nowrap; display: none; font-variant-numeric: tabular-nums; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+  .tip b { display: block; margin-bottom: 4px; font-weight: 600; }
+  .tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
+  .tip .r span:last-child { color: var(--text); }
+  .bottom-status { margin-top: 14px; }
+  /* Gizli mod: tutarların yerine *** */
+  body.privacy .sens:not(input), body.privacy .tip .r span:last-child { visibility: hidden; position: relative; }
+  body.privacy .sens:not(input)::after, body.privacy .tip .r span:last-child::after { content: "***"; visibility: visible; position: absolute; left: 0; top: 0; color: var(--text); }
+  body.privacy td.sens::after { left: auto; right: 8px; top: 10px; }
+  body.privacy .tip .r span:last-child::after { left: auto; right: 0; }
+  body.privacy .realized { position: relative; }
+  body.privacy .realized input.sens { color: transparent; caret-color: transparent; }
+  body.privacy .realized::before { content: "***"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; font-weight: 600; color: var(--text); pointer-events: none; z-index: 1; }
+  .tv-card { padding: 0; overflow: hidden; margin-bottom: 22px; }
+  .tv-chart { height: 520px; }
+  .tv-chart > div, .tv-chart iframe { height: 100% !important; width: 100% !important; }
+  @media (max-width: 560px) { .tv-chart { height: 420px; } }
+  .key-box { margin-bottom: 14px; border-color: var(--accent); }
+  .key-row { display: flex; gap: 8px; margin-top: 6px; }
+  .key-row input { flex: 1; min-width: 0; }
+  .c4 { position: relative; }
+  .mask4-btn { position: absolute; top: 9px; right: 9px; padding: 3px 8px; font-size: 12px; border-radius: 999px; background: transparent; color: var(--muted); }
+  .mask4-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .c4 .label.has-btn { padding-right: 70px; }
+  .cards.mask4 .c4 .value, .cards.mask4 #totValueAlt { visibility: hidden; position: relative; }
+  .cards.mask4 .c4 .value::after, .cards.mask4 #totValueAlt::after { content: "***"; visibility: visible; position: absolute; left: 0; top: 0; color: var(--text); }
+  .cards.mask4 .realized { position: relative; }
+  .cards.mask4 .realized input { color: transparent; caret-color: transparent; }
+  .cards.mask4 .realized::before { content: "***"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 18px; font-weight: 600; color: var(--text); pointer-events: none; z-index: 1; }
+  #privacyBtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  header { flex-wrap: nowrap; }
+  .head-left { display: flex; align-items: stretch; gap: 10px; flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; }
+  header h1 { margin-right: 8px; }
+  .head-total { padding: 10px 12px; min-width: 0; flex: 1 1 0; container-type: inline-size; }
+  .head-total .label { margin-bottom: 3px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .head-total .value { font-size: 24px; white-space: nowrap; line-height: 1.15; }
+  .head-total .sub { font-size: 14px; margin-top: 2px; }
+  @media (min-width: 1061px) {
+    header .controls { display: grid; grid-template-columns: auto auto; gap: 5px 6px; align-items: center; flex: 0 0 auto; }
+    header .controls select, header .controls button { width: 100%; padding: 4px 8px; }
+  }
+  @media (max-width: 1060px) { header { flex-wrap: wrap; } .head-left { width: 100%; } }
+  header .controls { gap: 6px; }
+  header .controls select, header .controls button { padding: 5px 8px; font-size: 13px; }
+  header .controls label { font-size: 12px; }
+  .head-total .sub:empty { display: none; }
+  .pf-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
+  .pf-bar button { padding: 5px 12px; font-size: 13px; border-radius: 999px; }
+  .pf-bar button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .pf-bar button[data-pf] { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .pf-bar button.dragging { opacity: .55; outline: 2px dashed var(--accent); outline-offset: 2px; cursor: grabbing; }
+  body.pf-drag, body.pf-drag * { cursor: grabbing !important; }
+  .pf-bar .pf-tool { padding: 5px 9px; background: transparent; color: var(--muted); }
+  .pf-bar .pf-add { border-style: dashed; color: var(--muted); }
+  .coin-pick { position: relative; }
+  .coin-pick input { width: 100%; }
+  .coin-list { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 50; max-height: 290px; overflow-y: auto; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.45); display: none; }
+  .coin-list.open { display: block; }
+  .coin-list div { padding: 7px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+  .coin-list div.sel, .coin-list div:hover { background: rgba(76,159,254,.18); }
+  .coin-list .rk { color: var(--muted); font-size: 12px; min-width: 28px; }
+  .coin-list .nm { color: var(--muted); font-size: 13px; }
+  .coin-list .none { color: var(--muted); cursor: default; }
+  .market { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-bottom: 18px; }
+  .market > div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 7px; font-variant-numeric: tabular-nums; }
+  .market b { font-size: 13px; }
+  .market .p { font-size: 13px; margin-top: 2px; }
+  .market .c { font-size: 12px; }
+  .market > div { display: grid; grid-template-columns: 1fr 1fr; align-items: center; column-gap: 0; }
+  .market .l { min-width: 0; overflow: hidden; }
+  .market .d { text-align: right; white-space: nowrap; border-left: 1px solid var(--line); padding-left: 3px; min-width: 0; align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
+  .market .d .k { font-size: 10px; color: var(--muted); }
+  .market .d .dp { font-size: 12px; font-weight: 600; }
+  .market .d .da { font-size: 12.5px; font-weight: 600; margin-top: 1px; letter-spacing: -0.2px; }
+  @media (max-width: 560px) { .market { grid-template-columns: repeat(2, 1fr); } }
+
+  @media (max-width: 820px) { form.add { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) {
+    .head-left { width: 100%; gap: 8px; flex-direction: column; }
+    .head-total { padding: 10px 14px; flex: 0 0 auto; }
+    .head-total .label { font-size: 15px; }
+    .head-total .sub { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card key-box" id="keyBox" style="display:none">
+    <div class="label" id="keyMsg"></div>
+    <div class="key-row"><input id="keyInput" type="password" placeholder="Senkronizasyon anahtarı" autocomplete="off"><button class="primary" id="keySave">Kaydet</button></div>
+  </div>
+  <div class="pf-bar" id="pfBar"></div>
+  <header>
+    <div class="head-left">
+    <div class="card head-total head-day"><div class="label">Son 1 saat</div><div class="value sens" id="hourPL">–</div><div class="sub" id="hourPct"></div></div>
+    <div class="card head-total head-day"><div class="label">Günlük açılıştan</div><div class="value sens" id="dayPL">–</div><div class="sub" id="dayPct"></div></div>
+    <div class="card total head-total"><div class="label">TOPLAM kâr / zarar</div><div class="value sens" id="grandPL">–</div><div class="sub status" id="grandPLAlt"></div></div>
+    </div>
+    <div class="controls">
+      <label class="status" for="period">Değişim:</label>
+      <select id="period">
+        <option value="1h">1 saat</option><option value="day">Günlük açılış</option><option value="24h">24 saat</option><option value="7d">1 hafta</option>
+        <option value="30d">1 ay</option><option value="90d">3 ay</option><option value="365d">1 yıl</option>
+      </select>
+      <label class="status" for="viewCur">Gösterim:</label>
+      <select id="viewCur">
+        <option value="usd">USD ($)</option>
+        <option value="try">TRY (₺)</option>
+      </select>
+      <button id="privacyBtn" title="Tutarları gizle / göster">👁 Gizle</button>
+      <button id="refreshBtn">↻ Fiyatları yenile</button>
+    </div>
+  </header>
+
+  <div class="market" id="market"></div>
+  <div class="card tv-card"><div id="tvChart" class="tv-chart"></div></div>
+
+  <div class="cards">
+    <div class="card c4"><button class="mask4-btn" id="mask4Btn" title="Bu 4 kutudaki tutarları gizle / göster">👁 Gizle</button><div class="label has-btn">Toplam varlık (güncel değer)</div><div class="value sens" id="totValue">–</div><div class="sub status sens" id="totValueAlt"></div></div>
+    <div class="card c4"><div class="label">Toplam maliyet (yatırılan)</div><div class="value sens" id="totCost">–</div></div>
+    <div class="card c4"><div class="label">Elimdekilerin kâr / zararı (gerçekleşmemiş)</div><div class="value" id="totPL">–</div><div class="sub" id="totPLPct"></div></div>
+    <div class="card c4">
+      <div class="label">Daha önce gerçekleşen kâr / zarar</div>
+      <div class="realized">
+        <input class="sens" id="realizedInput" inputmode="decimal" placeholder="0" title="Zarar için başına eksi koy, ör. -250">
+        <select id="realizedCur"><option value="usd">USD</option><option value="try">TRY</option></select>
+      </div>
+      <div class="sub status">Zarar için eksi gir (ör. -250)</div>
+    </div>
+    <div class="card changes">
+      <div class="label">Portföy değişimi</div>
+      <div class="chg-grid" id="chgBody"></div>
+      <div class="sub status chg-note">Elindeki miktarlar o tarihte de aynı olsaydı ne kadar değişirdi (USDT bazında). * işareti: bazı coinlerin o döneme ait verisi yok.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="chart-head">
+      <h2>Toplam kâr / zarar – günlük</h2>
+      <div class="range" id="rangeBtns2">
+        <button class="small" data-r="30">1 ay</button><button class="small" data-r="90">3 ay</button><button class="small" data-r="365">1 yıl</button><button class="small" data-r="1095">3 yıl</button><button class="small" data-r="1825">5 yıl</button><button class="small" data-r="3650">10 yıl</button>
+      </div>
+    </div>
+    <div class="legend"><span><i class="sw sw-g"></i>Kâr</span><span><i class="sw sw-r"></i>Zarar</span><span><i class="sw sw-c"></i>Sıfır çizgisi</span></div>
+    <div id="chartPL" class="chart"><div class="status chart-empty">Grafik yükleniyor…</div></div>
+    <div class="hint">Her gün için: o günkü toplam varlık − o güne kadar yatırılan + daha önce gerçekleşen kâr/zarar. Gerçekleşen kâr/zararın tarihi bilinmediği için her güne aynı tutar eklenir.</div>
+  </div>
+
+  <div class="panel">
+    <div class="chart-head">
+      <h2>Toplam varlık – günlük</h2>
+      <div class="range" id="rangeBtns">
+        <button class="small" data-r="30">1 ay</button><button class="small" data-r="90">3 ay</button><button class="small" data-r="365">1 yıl</button><button class="small" data-r="1095">3 yıl</button><button class="small" data-r="1825">5 yıl</button><button class="small" data-r="3650">10 yıl</button>
+      </div>
+    </div>
+    <div class="legend"><span><i class="sw sw-v"></i>Toplam varlık</span><span><i class="sw sw-c"></i>Maliyet (yatırılan)</span></div>
+    <div id="chart" class="chart"><div class="status chart-empty">Grafik yükleniyor…</div></div>
+    <div class="hint">Her gün için o günün Binance kapanış fiyatı × o gün elinde olan miktar. Tarihli alımlar o tarihten itibaren, tarihsiz alımlar tüm dönem boyunca hesaba katılır.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Alım ekle</h2>
+    <form class="add" id="addForm" autocomplete="off">
+      <div>
+        <label>Coin</label>
+        <div class="coin-pick">
+          <input id="coinInput" type="text" placeholder="Coin ara: ör. BTC, Solana" autocomplete="off" spellcheck="false">
+          <div class="coin-list" id="coinList"></div>
+        </div>
+      </div>
+      <div><label>Miktar</label><input id="amountInput" type="text" inputmode="decimal" placeholder="ör. 0,25" required></div>
+      <div><label>Alış fiyatı (1 adet)</label><input id="priceInput" type="text" inputmode="decimal" placeholder="ör. 65000" required></div>
+      <div><label>Para birimi</label>
+        <select id="curInput"><option value="usd">USD / USDT</option><option value="try">TRY</option></select>
+      </div>
+      <div><label>Alış tarihi (isteğe bağlı)</label><input id="dateInput" type="date"></div>
+      <div><button class="primary" type="submit">Ekle</button></div>
+    </form>
+    <div class="hint">Elinde zaten olan bir coinden tekrar alım eklersen program sana ortalamaya mı katsın, ayrı kalem mi göstersin diye sorar. Ondalık için virgül ya da nokta kullanabilirsin. USD seçeneği Binance&#39;teki USDT fiyatıdır.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Varlıklarım</h2>
+    <div class="table-wrap">
+      <table class="hold">
+        <thead>
+          <tr>
+            <th>Coin</th><th>Miktar</th><th>Alış fiyatı</th><th>Güncel fiyat</th><th>1s</th><th title="Günlük açılıştan (03:00) bu yana">Gün</th><th>24s</th>
+            <th>Maliyet</th><th>Güncel değer</th><th>Kâr / Zarar</th><th>%</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty">Henüz bir şey eklemedin. Yukarıdan ilk alımını ekle.</div>
+  </div>
+
+  <div class="footer">
+    <span class="grow"><span id="storeNote">Veriler sadece bu bilgisayarda, tarayıcının içinde saklanır.</span> Fiyatlar Binance'ten (USDT pariteleri) her 30 saniyede bir güncellenir; TL karşılığı Binance USDT/TRY kuruyla hesaplanır.</span>
+    <button id="exportBtn">Yedek al (dışa aktar)</button>
+    <button id="importBtn">Yedekten yükle</button>
+    <input type="file" id="importFile" accept=".json" hidden>
+  </div>
+  <div class="status bottom-status"><span id="status">Fiyatlar yükleniyor…</span> <span id="sync" class="sync"></span></div>
+</div>
+
+<dialog id="mergeDlg">
+  <form method="dialog">
+    <strong id="mergeTitle"></strong>
+    <p id="mergeText" class="merge-text"></p>
+    <div class="row merge-row">
+      <button value="cancel" formnovalidate>Vazgeç</button>
+      <button value="separate">Ayrı kalem olarak ekle</button>
+      <button class="primary" value="merge" id="mergeBtn">Ortalamaya kat</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="editDlg">
+  <form method="dialog" id="editForm">
+    <strong id="editTitle">Alımı düzenle</strong>
+    <label>Miktar</label><input id="eAmount" inputmode="decimal" required>
+    <label>Alış fiyatı (1 adet)</label><input id="ePrice" inputmode="decimal" required>
+    <label>Para birimi</label><select id="eCur"><option value="usd">USD</option><option value="try">TRY</option></select>
+    <label>Alış tarihi</label><input id="eDate" type="date">
+    <div class="row">
+      <button value="cancel" formnovalidate>Vazgeç</button>
+      <button class="primary" value="ok">Kaydet</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="manualDlg">
+  <form method="dialog">
+    <strong id="manualTitle">Manuel fiyat</strong>
+    <div class="hint">İnternet yoksa veya Binance'e ulaşılamıyorsa güncel fiyatı kendin girebilirsin. Boş bırakırsan otomatik fiyata döner.</div>
+    <label>Güncel fiyat (1 adet)</label><input id="mPrice" inputmode="decimal">
+    <label>Para birimi</label><select id="mCur"><option value="usd">USD</option><option value="try">TRY</option></select>
+    <div class="row">
+      <button value="cancel" formnovalidate>Vazgeç</button>
+      <button class="primary" value="ok">Kaydet</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+window.addEventListener("error", e => { const el = document.getElementById("status"); if (el) el.textContent = "Hata: " + e.message + " (satır " + e.lineno + ")"; });
+(() => {
+  const STORE_KEY = "kripto-portfoy-v1";
+  // Binance genel piyasa verisi (hesap/anahtar gerekmez). İlki olmazsa yedek adres denenir.
+  const BINANCE_HOSTS = ["https://api.binance.com", "https://data-api.binance.vision"];
+
+  // Takip edilen coinler: tüm portföylerdeki alımlardan otomatik çıkarılır (Binancete USDT paritesi)
+  let COINS = [];
+  function refreshCoins() {
+    const seen = {};
+    for (const pf of state.portfolios) for (const l of (pf.id === state.active ? state.lots : pf.lots) || [])
+      if (!seen[l.coinId]) seen[l.coinId] = { id: l.coinId, symbol: l.symbol, name: l.name };
+    const old = COINS.map(c => c.id).join();
+    COINS = Object.values(seen);
+    return COINS.map(c => c.id).join() !== old;
+  }
+
+  // ---------- durum ----------
+  let state = load();
+  let prices = {};          // { coinId: {usd, try, usd_24h_change} }
+  let usdTry = null;        // 1 USD kaç TL
+  // Değişim dönemleri
+  const PERIODS = [
+    { key: "1h",   label: "1 saat",  short: "1s" },
+    { key: "day",  label: "Günlük açılıştan", short: "Gün" },
+    { key: "24h",  label: "24 saat", short: "24s" },
+    { key: "7d",   label: "1 hafta", short: "1h" },
+    { key: "30d",  label: "1 ay",    short: "1a" },
+    { key: "90d",  label: "3 ay",    short: "3a" },
+    { key: "365d", label: "1 yıl",   short: "1y" }
+  ];
+  const DAYS = { "30d": 30, "90d": 90, "365d": 365 };
+  let windowChg = {};       // { coinId: { 1h: %, 7d: % } }  (Binance kayan pencere)
+  let pastClose = {};       // { coinId: { 30d: fiyat, 90d: fiyat, 365d: fiyat } } (günlük mumlardan)
+  let daily = {};           // { coinId | USDTTRY: [[gün (ms), kapanış], ...] }  grafik için
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (s && Array.isArray(s.lots)) return migrate(Object.assign({ viewCur: "usd", manual: {} }, s));
+    } catch (e) {}
+    return migrate({ lots: [], viewCur: "usd", manual: {} });
+  }
+  // Eski sürümde (CoinGecko) kaydedilen alımları sembole çevir
+  function migrate(s) {
+    // Birden fazla portföy: eski tek portföylü veriyi Ana portföy yap
+    if (!Array.isArray(s.portfolios) || !s.portfolios.length) {
+      s.portfolios = [{ id: "p1", name: "Ana portföy", lots: s.lots || [], realized: s.realized || { amount: 0, cur: "usd" } }];
+      s.active = "p1";
+    }
+    let act = s.portfolios.find(p => p.id === s.active);
+    if (!act) { act = s.portfolios[0]; s.active = act.id; }
+    if (!Array.isArray(act.lots)) act.lots = [];
+    s.lots = act.lots; s.realized = act.realized || { amount: 0, cur: "usd" };
+    const oldManual = s.manual || {};
+    s.manual = {};
+    for (const pf of s.portfolios) for (const l of (pf.lots || (pf.lots = []))) {
+      const oldId = l.coinId;
+      l.symbol = String(l.symbol || l.coinId).toUpperCase();
+      l.coinId = l.symbol;
+      if (oldManual[oldId]) s.manual[l.coinId] = oldManual[oldId];
+    }
+    for (const k in oldManual) if (k === k.toUpperCase()) s.manual[k] = oldManual[k];
+    return s;
+  }
+  // Aktif portföyün güncel alımlarını portföy listesine yaz
+  function syncActive() {
+    const act = state.portfolios.find(p => p.id === state.active);
+    if (act) { act.lots = state.lots; act.realized = state.realized || { amount: 0, cur: "usd" }; }
+  }
+  // ---------- bulut senkronizasyonu ----------
+  // Google Sites sayfasında google.script.run, telefon uygulamasında (GitHub) Apps Script adresine POST kullanılır.
+  // Her iki yol da gizli senkronizasyon anahtarı ister (cihaz başına bir kez girilir).
+  const GAS = typeof google !== "undefined" && google.script && google.script.run;
+  const API_URL = "https://script.google.com/macros/s/AKfycbxJ595v__AVdD6w5QN8j0r3vpAe5061Wt7qvz2XPvY9CzUTH8GZ5GM1bCrdGLVPKOKi/exec";
+  const CLOUD = GAS || API_URL.indexOf("script.google") >= 0;
+  const KEY_STORE = "kripto-anahtar";
+  let apiKey = "";
+  try { apiKey = localStorage.getItem(KEY_STORE) || ""; } catch (e) {}
+  const gs = (fn, ...args) => new Promise((res, rej) =>
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+  async function api(op, data) {
+    if (!apiKey) throw new Error("key");
+    if (GAS) return op === "load" ? gs("loadData", apiKey) : gs("saveData", data, apiKey);
+    const r = await fetch(API_URL, { method: "POST", body: JSON.stringify({ api: op, key: apiKey, data }) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "hata");
+    return j.data;
+  }
+  const isKeyErr = e => /key/.test(String(e && (e.message || e)));
+  function showKeyBox(wrong) {
+    const box = $("keyBox"); if (!box) return;
+    box.style.display = "";
+    $("keyMsg").textContent = wrong ? "Anahtar yanlış görünüyor, tekrar dener misin?" : "Verilerinin bu cihazda da görünmesi için senkronizasyon anahtarını bir kez gir.";
+  }
+  let cloudTimer = null, cloudBusy = false, cloudDirty = false;
+
+  function setSync(text, bad) {
+    const el = $("sync"); if (!el) return;
+    el.textContent = text; el.className = "sync" + (bad ? " bad" : "");
+  }
+  function save() {
+    syncActive();
+    if (refreshCoins()) { fetchPrices(); fetchWindows(); fetchHistory(); }
+    state.updatedAt = Date.now();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+    if (CLOUD) { cloudDirty = true; clearTimeout(cloudTimer); cloudTimer = setTimeout(pushCloud, 800); setSync("☁ Kaydediliyor…"); }
+  }
+  async function pushCloud() {
+    if (cloudBusy) { cloudTimer = setTimeout(pushCloud, 500); return; }
+    cloudBusy = true; cloudDirty = false;
+    try { await api("save", JSON.stringify(state)); setSync("☁ Senkronize"); }
+    catch (e) {
+      cloudDirty = true;
+      if (isKeyErr(e)) { setSync("☁ Anahtar gerekli", true); showKeyBox(!!apiKey); }
+      else { setSync("☁ Kaydedilemedi, tekrar denenecek", true); cloudTimer = setTimeout(pushCloud, 10000); }
+    }
+    cloudBusy = false;
+  }
+  async function pullCloud(first) {
+    if (!CLOUD || cloudDirty || cloudBusy) return;
+    try {
+      const txt = await api("load");
+      if (cloudDirty) return; // bu arada yerel değişiklik olduysa ezme
+      if (txt) {
+        const remote = JSON.parse(txt);
+        if (remote && Array.isArray(remote.lots) && (remote.updatedAt || 0) > (state.updatedAt || 0)) {
+          state = migrate(Object.assign({ viewCur: "usd", manual: {} }, remote));
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+          refreshCoins(); render(); fetchPrices(); fetchWindows(); fetchHistory();
+        } else if (first && (state.updatedAt || 0) > (remote.updatedAt || 0)) {
+          pushCloud();
+        }
+      } else if (first && state.lots.length) {
+        pushCloud();
+      }
+      setSync("☁ Senkronize");
+    } catch (e) {
+      if (isKeyErr(e)) { setSync("☁ Anahtar gerekli", true); showKeyBox(!!apiKey); }
+      else setSync("☁ Buluta ulaşılamadı", true);
+    }
+  }
+
+  // ---------- yardımcılar ----------
+  const $ = id => document.getElementById(id);
+  const num = s => { const n = parseFloat(String(s).trim().replace(/\s/g, "").replace(",", ".")); return isFinite(n) ? n : NaN; };
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+  function convert(value, from, to) {
+    if (from === to) return value;
+    if (!usdTry) return NaN;
+    return from === "usd" ? value * usdTry : value / usdTry;
+  }
+  function fmtMoney(v, cur, signed) {
+    if (!isFinite(v)) return "–";
+    const abs = Math.abs(v);
+    const digits = abs === 0 ? 2 : abs < 0.01 ? 8 : abs < 1 ? 4 : 2;
+    const s = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: digits }).format(abs);
+    const sym = cur === "usd" ? "$" : "₺";
+    const sign = v < 0 ? "−" : (signed && v > 0 ? "+" : "");
+    return cur === "usd" ? `${sign}${sym}${s}` : `${sign}${s} ${sym}`;
+  }
+  function fmtNum(v) {
+    if (!isFinite(v)) return "–";
+    return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 8 }).format(v);
+  }
+  function fmtPct(v) {
+    if (!isFinite(v)) return "–";
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v)) + "%";
+  }
+  const cls = v => !isFinite(v) || v === 0 ? "" : v > 0 ? "pos" : "neg";
+
+  // Bir coinin güncel fiyatı, istenen para biriminde
+  function currentPrice(coinId, cur) {
+    const m = state.manual[coinId];
+    if (m) return convert(m.price, m.cur, cur);
+    const p = prices[coinId];
+    if (!p) return NaN;
+    if (p[cur] != null) return p[cur];
+    return convert(p.usd, "usd", cur);
+  }
+
+  // Bir coinin seçilen dönemdeki yüzde değişimi (USDT bazında)
+  function changePct(coinId, key) {
+    if (state.manual[coinId]) return NaN;
+    const p = prices[coinId];
+    if (key === "24h") return p ? p.usd_24h_change : NaN;
+    if (DAYS[key]) {
+      const past = pastClose[coinId] && pastClose[coinId][key];
+      return p && past ? (p.usd / past - 1) * 100 : NaN;
+    }
+    if (key === "day") {
+      const w = windowChg[coinId];
+      if (w && isFinite(w.dayOpen) && p) return (p.usd / w.dayOpen - 1) * 100;
+      const k = daily[coinId], today = Math.floor(Date.now() / 86400000) * 86400000;
+      const row = k && k[k.length - 1];
+      return row && row[0] === today && row[2] && p ? (p.usd / row[2] - 1) * 100 : NaN;
+    }
+    const w = windowChg[coinId];
+    return w && isFinite(w[key]) ? w[key] : NaN;
+  }
+
+  // ---------- fiyat çekme ----------
+  let hostIdx = 0;
+  async function binanceGet(path) {
+    let lastErr;
+    for (let i = 0; i < BINANCE_HOSTS.length; i++) {
+      const host = BINANCE_HOSTS[(hostIdx + i) % BINANCE_HOSTS.length];
+      try {
+        const r = await fetch(host + path);
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const data = await r.json();
+        hostIdx = (hostIdx + i) % BINANCE_HOSTS.length; // çalışan adresi hatırla
+        return data;
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+  // USDT kendisi Binance paritesi değildir: fiyatı 1 dolar kabul edilir
+  const tradable = () => COINS.filter(c => c.id !== "USDT");
+  const binanceTickers = symbols =>
+    binanceGet("/api/v3/ticker/24hr?symbols=" + encodeURIComponent(JSON.stringify(symbols)));
+
+  // 1 saat ve 1 hafta: Binance kayan pencere tickerı
+  async function fetchWindows() {
+    if (COINS.some(c => c.id === "USDT")) windowChg.USDT = { "1h": 0, "7d": 0, dayOpen: 1 };
+    if (!tradable().length) { render(); return; }
+    const symbols = encodeURIComponent(JSON.stringify(tradable().map(c => c.symbol + "USDT")));
+    for (const [key, win] of [["1h", "1h"], ["7d", "7d"]]) {
+      try {
+        const data = await binanceGet(`/api/v3/ticker?symbols=${symbols}&windowSize=${win}&type=MINI`);
+        for (const t of data) {
+          const c = COINS.find(x => x.symbol + "USDT" === t.symbol); if (!c) continue;
+          const open = parseFloat(t.openPrice), last = parseFloat(t.lastPrice);
+          (windowChg[c.id] || (windowChg[c.id] = {}))[key] = open ? (last / open - 1) * 100 : NaN;
+        }
+      } catch (e) {}
+    }
+    // Günlük açılış: Binance günlük mum açılışı (UTC 00:00 = TR 03:00)
+    try {
+      const data = await binanceGet(`/api/v3/ticker/tradingDay?symbols=${symbols}&type=MINI`);
+      for (const t of data) {
+        const c = COINS.find(x => x.symbol + "USDT" === t.symbol); if (!c) continue;
+        (windowChg[c.id] || (windowChg[c.id] = {})).dayOpen = parseFloat(t.openPrice);
+      }
+    } catch (e) {}
+    render();
+  }
+
+  // 1 ay, 3 ay, 1 yıl: günlük mumlardan o günün kapanış fiyatı
+  // Binance tek istekte en fazla 1000 günlük mum verir: uzun geçmişi parça parça çek
+  async function klinesSince(symbol, days) {
+    let start = Date.now() - days * 86400000, out = [];
+    for (let guard = 0; guard < 6; guard++) {
+      const k = await binanceGet(`/api/v3/klines?symbol=${symbol}&interval=1d&limit=1000&startTime=${start}`);
+      out = out.concat(k);
+      if (k.length < 1000) break;
+      start = k[k.length - 1][0] + 86400000;
+    }
+    return out;
+  }
+  // Yeni gelen son günleri eski uzun geçmişle birleştir
+  function mergeDaily(oldRows, newRows) {
+    if (!oldRows || !oldRows.length || !newRows.length) return newRows;
+    const first = newRows[0][0];
+    return oldRows.filter(r => r[0] < first).concat(newRows);
+  }
+  let historyFull = false, historyBusy = false, historyAgain = false;
+  async function fetchHistory() {
+    if (historyBusy) { historyAgain = true; return; }
+    historyBusy = true;
+    try { await fetchHistoryInner(); } finally { historyBusy = false; }
+    if (historyAgain) { historyAgain = false; fetchHistory(); }
+  }
+  async function fetchHistoryInner() {
+    // İlk seferde 10 yıllık geçmiş, sonraki yenilemelerde sadece son 1 yıl
+    const days = historyFull ? 366 : 3653;
+    let ok = true;
+    for (const c of tradable()) {
+      try {
+        const k = await klinesSince(c.symbol + "USDT", daily[c.id] ? days : 3653);
+        const rows = k.map(r => [r[0], parseFloat(r[4]), parseFloat(r[1])]);
+        daily[c.id] = mergeDaily(daily[c.id], rows);
+        // son satır = bugünün (devam eden) mumu; N gün önceki kapanış = [son - N]
+        const d = daily[c.id], last = d.length - 1, out = {};
+        for (const key in DAYS) { const row = d[last - DAYS[key]]; if (row) out[key] = row[1]; }
+        pastClose[c.id] = out;
+      } catch (e) { ok = false; }
+    }
+    try {
+      const k = await klinesSince("USDTTRY", days);
+      daily.USDTTRY = mergeDaily(daily.USDTTRY, k.map(r => [r[0], parseFloat(r[4])]));
+    } catch (e) { ok = false; }
+    if (COINS.some(c => c.id === "USDT") && !daily.USDT) {
+      const today = Math.floor(Date.now() / 86400000) * 86400000, rows = [];
+      for (let i = 3652; i >= 0; i--) rows.push([today - i * 86400000, 1, 1]);
+      daily.USDT = rows; pastClose.USDT = { "30d": 1, "90d": 1, "365d": 1 };
+    }
+    if (ok) historyFull = true;
+    render();
+  }
+
+  async function fetchPrices() {
+    $("status").textContent = "Fiyatlar güncelleniyor…";
+    try {
+      const symbols = tradable().map(c => c.symbol + "USDT").concat("USDTTRY");
+      const data = await binanceTickers(symbols);
+      const map = {};
+      for (const t of data) map[t.symbol] = t;
+      if (map.USDTTRY) usdTry = parseFloat(map.USDTTRY.lastPrice);
+      for (const c of COINS) {
+        const t = map[c.symbol + "USDT"];
+        if (!t) continue;
+        const usd = parseFloat(t.lastPrice);
+        prices[c.id] = { usd, try: usdTry ? usd * usdTry : null, usd_24h_change: parseFloat(t.priceChangePercent) };
+      }
+      if (COINS.some(c => c.id === "USDT")) prices.USDT = { usd: 1, try: usdTry, usd_24h_change: 0 };
+      const t = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      $("status").textContent = `Binance · son güncelleme: ${t}` + (usdTry ? ` · 1 USDT = ${usdTry.toFixed(2)} ₺` : "");
+    } catch (e) {
+      $("status").textContent = "Binance'ten fiyat alınamadı (" + e.message + "). İnternet bağlantını kontrol et ya da manuel fiyat gir.";
+    }
+    render();
+  }
+
+  // Şeritte 1000 üstü fiyatlar küsuratsız
+  const fmtPrice = (v, cur) => Math.abs(v) >= 1000 && isFinite(v) ? fmtMoney(Math.round(v), cur).replace(/,00(?=\D|$)/, "") : fmtMoney(v, cur);
+  // Tabloda 1000 üstü tutarlar küsuratsız
+  const fmtBig = (v, cur, sign) => isFinite(v) && Math.abs(v) >= 1000 ? fmtMoney(Math.round(v), cur, sign).replace(/,00(?=\D|$)/, "") : fmtMoney(v, cur, sign);
+  function fmtShortAmt(v, cur) {
+    if (!isFinite(v)) return "";
+    const a = Math.abs(v), sym = cur === "usd" ? "$" : "₺";
+    const n = new Intl.NumberFormat("tr-TR", a >= 10000 ? { notation: "compact", maximumFractionDigits: 1 } : { maximumFractionDigits: 0 }).format(a);
+    const sign = v < 0 ? "−" : v > 0 ? "+" : "";
+    return cur === "usd" ? sign + sym + n : sign + n + " " + sym;
+  }
+  function renderMarket() {
+    const cur = state.viewCur;
+    const vals = {};
+    for (const l of state.lots) vals[l.coinId] = (vals[l.coinId] || 0) + l.amount * (currentPrice(l.coinId, "usd") || 0);
+    const per = state.period || "24h", chv = id => { const v = changePct(id, per); return isFinite(v) ? v : -Infinity; };
+    const act = COINS.filter(c => c.id in vals).sort((a, b) => chv(b.id) - chv(a.id) || vals[b.id] - vals[a.id]);
+    $("market").style.display = act.length ? "" : "none";
+    $("market").innerHTML = act.map(c => {
+      const p = prices[c.id];
+      const price = p ? (cur === "try" ? p.try : p.usd) : NaN;
+      const ch = changePct(c.id, state.period || "24h");
+      // Günlük açılıştan bu yana: yüzde ve elindeki miktarın tutar değişimi
+      const dp = changePct(c.id, "day");
+      const held = state.lots.filter(l => l.coinId === c.id).reduce((s, l) => s + l.amount, 0) * currentPrice(c.id, cur);
+      const da = isFinite(dp) && isFinite(held) ? held - held / (1 + dp / 100) : NaN;
+      return `<div><div class="l"><b>${c.symbol}</b><div class="p">${fmtPrice(price, cur)}</div><div class="c ${cls(ch)}">${fmtPct(ch)}</div></div>` +
+        `<div class="d" title="Günlük açılıştan (03:00) bu yana"><div class="k">Gün</div><div class="dp ${cls(dp)}">${fmtPct(dp)}</div><div class="da sens ${cls(da)}">${fmtShortAmt(da, cur)}</div></div></div>`;
+    }).join("");
+  }
+
+  // ---------- hesaplama ----------
+  function summarize(cur) {
+    const groups = {};
+    for (const l of state.lots) {
+      const g = groups[l.coinId] || (groups[l.coinId] = { coinId: l.coinId, symbol: l.symbol, name: l.name, amount: 0, cost: 0, lots: [] });
+      g.amount += l.amount;
+      g.cost += convert(l.amount * l.price, l.cur, cur);
+      g.lots.push(l);
+    }
+    const rows = Object.values(groups).map(g => {
+      const price = currentPrice(g.coinId, cur);
+      const value = g.amount * price;
+      const pl = value - g.cost;
+      const chg = {};
+      for (const pr of PERIODS) { const c = changePct(g.coinId, pr.key); chg[pr.key] = isFinite(c) ? value - value / (1 + c / 100) : NaN; }
+      return Object.assign(g, { price, value, pl, plPct: g.cost ? pl / g.cost * 100 : NaN, avg: g.cost / g.amount, chg });
+    });
+    rows.sort((a, b) => (isFinite(b.value) ? b.value : -1) - (isFinite(a.value) ? a.value : -1));
+    return rows;
+  }
+
+  // ---------- çizim ----------
+  function render() {
+    const cur = state.viewCur;
+    $("viewCur").value = cur;
+    renderPortfolios();
+    renderMarket();
+    const rows = summarize(cur);
+    const tb = $("tbody");
+    $("empty").style.display = rows.length ? "none" : "block";
+
+    const order = id => { const i = COINS.findIndex(c => c.id === id); return i < 0 ? 999 : i; };
+    const val = l => { const v = l.amount * currentPrice(l.coinId, cur); return isFinite(v) ? v : -1; };
+    const lots = state.lots.slice().sort((x, y) => val(y) - val(x) || order(x.coinId) - order(y.coinId));
+    const count = {};
+    for (const l of lots) count[l.coinId] = (count[l.coinId] || 0) + 1;
+    let html = "";
+    for (const l of lots) {
+      const price = currentPrice(l.coinId, cur);
+      const buy = convert(l.price, l.cur, cur);
+      const cost = l.amount * buy;
+      const val = l.amount * price;
+      const pl = val - cost;
+      const ch = changePct(l.coinId, "24h");
+      const ch1 = changePct(l.coinId, "1h"), chD = changePct(l.coinId, "day");
+      const manual = state.manual[l.coinId] ? `<span class="manual" title="Manuel girilmiş fiyat">manuel</span>` : "";
+      const tag = l.date ? new Date(l.date + "T00:00").toLocaleDateString("tr-TR")
+                : (count[l.coinId] > 1 ? "ayrı kalem" : "");
+      html += `<tr>
+        <td><span class="cn">${esc(l.name)}</span><span class="sym">${esc(l.symbol)}</span>${tag ? `<div class="sub-tag">${tag}</div>` : ""}</td>
+        <td class="sens">${fmtNum(l.amount)}</td>
+        <td>${fmtMoney(buy, cur)}</td>
+        <td>${fmtMoney(price, cur)}${manual}</td>
+        <td class="${cls(ch1)}">${fmtPct(ch1)}</td>
+        <td class="${cls(chD)}">${fmtPct(chD)}</td>
+        <td class="${cls(ch)}">${fmtPct(ch)}</td>
+        <td class="sens">${fmtBig(cost, cur)}</td>
+        <td class="sens">${fmtBig(val, cur)}</td>
+        <td class="sens ${cls(pl)}">${fmtBig(pl, cur, true)}</td>
+        <td class="${cls(pl)}">${fmtPct(cost ? pl / cost * 100 : NaN)}</td>
+        <td class="acts"><button class="small" data-act="edit" data-id="${l.id}" title="Düzenle">✎</button><button class="small" data-act="manual" data-coin="${esc(l.coinId)}" title="Güncel fiyatı elle gir">$</button><button class="small danger" data-act="del" data-id="${l.id}" title="Sil">🗑</button></td>
+      </tr>`;
+    }
+    tb.innerHTML = html;
+
+    // Toplamlar
+    const known = rows.filter(r => isFinite(r.value));
+    const totValue = known.reduce((s, r) => s + r.value, 0);
+    const totCostKnown = known.reduce((s, r) => s + r.cost, 0);
+    const totCostAll = rows.reduce((s, r) => s + (isFinite(r.cost) ? r.cost : 0), 0);
+    const totPL = totValue - totCostKnown;
+    const missing = rows.length - known.length;
+
+    $("totValue").textContent = rows.length ? fmtMoney(totValue, cur) : "–";
+    const alt = cur === "usd" ? "try" : "usd";
+    $("totValueAlt").textContent = rows.length && usdTry ? "≈ " + fmtMoney(convert(totValue, cur, alt), alt) : "";
+    $("totCost").textContent = rows.length ? fmtMoney(totCostAll, cur) : "–";
+    $("totPL").textContent = rows.length ? fmtMoney(totPL, cur, true) : "–";
+    $("totPL").className = "value sens " + cls(totPL);
+    $("totPLPct").textContent = rows.length ? fmtPct(totCostKnown ? totPL / totCostKnown * 100 : NaN) + (missing ? ` · ${missing} coinin fiyatı yok, hesaba katılmadı` : "") : "";
+    $("totPLPct").className = "sub " + cls(totPL);
+    // Gerçekleşmiş + gerçekleşmemiş = toplam
+    const r = state.realized || { amount: 0, cur: "usd" };
+    const realized = convert(r.amount || 0, r.cur, cur);
+    const grand = (rows.length ? totPL : 0) + (isFinite(realized) ? realized : 0);
+    const anything = rows.length || r.amount;
+    $("grandPL").textContent = anything ? fmtMoney(grand, cur, true) : "–";
+    $("grandPL").className = "value sens " + cls(grand);
+    $("grandPLAlt").textContent = anything
+      ? (isFinite(realized) ? "" : "Kur alınamadığı için gerçekleşen kâr/zarar dahil edilemedi")
+      : "";
+    if (document.activeElement !== $("realizedInput"))
+      $("realizedInput").value = r.amount ? String(r.amount).replace(".", ",") : "";
+    $("realizedCur").value = r.cur;
+
+    drawChart();
+    drawPLChart();
+    // Dönemlere göre portföy değişimi
+    const sel = state.period || "24h";
+    $("period").value = sel;
+    // Üstteki Son 1 saat ve Günlük açılıştan kutuları
+    for (const [key, plId, pctId] of [["1h", "hourPL", "hourPct"], ["day", "dayPL", "dayPct"]]) {
+      const withData = known.filter(r => isFinite(r.chg[key]));
+      const amt = withData.reduce((s, r) => s + r.chg[key], 0);
+      const base = withData.reduce((s, r) => s + r.value, 0) - amt;
+      $(plId).textContent = withData.length ? fmtMoney(amt, cur, true) + (withData.length < known.length ? " *" : "") : "–";
+      $(plId).className = "value sens " + (withData.length ? cls(amt) : "");
+      $(pctId).textContent = withData.length ? fmtPct(base ? amt / base * 100 : NaN) : "";
+      $(pctId).className = "sub " + (withData.length ? cls(amt) : "");
+    }
+    fitHead();
+    $("chgBody").innerHTML = PERIODS.filter(pr => pr.key !== "day" && pr.key !== "1h").map(pr => {
+      const withData = known.filter(r => isFinite(r.chg[pr.key]));
+      if (!withData.length) return `<div class="chg-box"><div class="k">${pr.label}</div><div class="a">–</div><div class="p">&nbsp;</div></div>`;
+      const amt = withData.reduce((s, r) => s + r.chg[pr.key], 0);
+      const base = withData.reduce((s, r) => s + r.value, 0) - amt;
+      const part = withData.length < known.length ? " *" : "";
+      return `<div class="chg-box"><div class="k">${pr.label}</div><div class="a sens ${cls(amt)}">${fmtMoney(amt, cur, true)}${part}</div><div class="p ${cls(amt)}">${fmtPct(base ? amt / base * 100 : NaN)}</div></div>`;
+    }).join("");
+  }
+
+  // ---------- günlük toplam varlık grafiği ----------
+  const DAY = 86400000;
+  function chartSeries(cur, days) {
+    const ref = state.lots.map(l => daily[l.coinId]).filter(a => a && a.length).sort((a, b) => b.length - a.length)[0];
+    if (!ref || !state.lots.length) return null;
+    const maps = {};
+    for (const id in daily) maps[id] = new Map(daily[id].map(([t, c]) => [t, c]));
+    const pts = [];
+    for (const [t] of ref.slice(-days - 1)) {
+      const dayEnd = t + DAY - 1;
+      const fx = cur === "try" ? (maps.USDTTRY && maps.USDTTRY.get(t)) || usdTry : 1;
+      let value = 0, cost = 0, held = false, missing = false;
+      for (const l of state.lots) {
+        if (l.date && new Date(l.date + "T00:00").getTime() > dayEnd) continue; // henüz alınmamış
+        held = true;
+        cost += convert(l.amount * l.price, l.cur, cur);
+        const close = maps[l.coinId] && maps[l.coinId].get(t);
+        if (close == null) { missing = true; continue; }
+        value += l.amount * close * fx;
+      }
+      if (!held) continue;
+      pts.push({ t, value: missing ? NaN : value, cost });
+    }
+    // son nokta: canlı fiyatla bugünkü değer
+    if (pts.length) {
+      const live = summarize(cur).reduce((s, r) => s + r.value, 0);
+      if (isFinite(live)) pts[pts.length - 1].value = live;
+    }
+    return pts.filter(p => isFinite(p.value) && isFinite(p.cost));
+  }
+
+  function niceTicks(min, max, n) {
+    const span = max - min || Math.abs(max) || 1;
+    const step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+    const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step;
+    const out = []; for (let v = lo; v <= hi + step / 2; v += step) out.push(v);
+    return out;
+  }
+  const fmtShort = (v, cur) => {
+    if (document.body.classList.contains("privacy")) return "***";
+    const sym = cur === "usd" ? "$" : "₺";
+    const s = new Intl.NumberFormat("tr-TR", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(v));
+    const sign = v < 0 ? "−" : "";
+    return cur === "usd" ? sign + sym + s : sign + s + " " + sym;
+  };
+
+  // İstenen dönemden daha kısa veri varsa grafiğin köşesinde belirt
+  function startNote(pts, days) {
+    const want = Date.now() - days * 86400000;
+    if (pts[0].t <= want + 7 * 86400000) return "";
+    const d = new Date(pts[0].t).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+    return `<div class="chart-from">Veri ${d} tarihinden başlıyor (bazı coinlerin Binance geçmişi daha kısa)</div>`;
+  }
+
+  function drawChart() {
+    const box = $("chart"), cur = state.viewCur, days = state.chartDays || 90;
+    document.querySelectorAll(".range button[data-r]").forEach(b => b.classList.toggle("on", +b.dataset.r === days));
+    const pts = chartSeries(cur, days);
+    if (!pts || pts.length < 2) {
+      box.innerHTML = `<div class="status chart-empty">${state.lots.length ? "Grafik verisi yükleniyor…" : "Alım ekleyince grafik burada görünecek."}</div>`;
+      return;
+    }
+    const W = Math.max(300, box.clientWidth), H = box.clientHeight || 280;
+    const m = { l: 64, r: 16, t: 10, b: 26 };
+    const all = pts.flatMap(p => [p.value, p.cost]);
+    const ticks = niceTicks(Math.min(...all), Math.max(...all), 4);
+    const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+    const x = i => m.l + i * (W - m.l - m.r) / (pts.length - 1);
+    const y = v => m.t + (1 - (v - y0) / (y1 - y0 || 1)) * (H - m.t - m.b);
+    const path = key => pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(p[key]).toFixed(1)).join("");
+    const grid = ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#2b3640" stroke-width="1"/>
+      <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" fill="#8b98a5" font-size="11">${fmtShort(v, cur)}</text>`).join("");
+    const nX = Math.min(W < 520 ? 3 : 6, pts.length), xl = [];
+    for (let k = 0; k < nX; k++) {
+      const i = Math.round(k * (pts.length - 1) / (nX - 1));
+      const d = new Date(pts[i].t);
+      xl.push(`<text x="${x(i)}" y="${H - 6}" text-anchor="${k === 0 ? "start" : k === nX - 1 ? "end" : "middle"}" fill="#8b98a5" font-size="11">${d.toLocaleDateString("tr-TR", days > 1000 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short", year: days > 180 ? "2-digit" : undefined })}</text>`);
+    }
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Günlük toplam varlık grafiği">
+      ${grid}${xl.join("")}
+      <path d="${path("cost")}" fill="none" stroke="#8b98a5" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <path d="${path("value")}" fill="none" stroke="#4c9ffe" stroke-width="2" stroke-linejoin="round"/>
+      <g id="hover" style="display:none">
+        <line id="hx" y1="${m.t}" y2="${H - m.b}" stroke="#8b98a5" stroke-width="1"/>
+        <circle id="hc" r="4" fill="#8b98a5" stroke="#182029" stroke-width="2"/>
+        <circle id="hv" r="5" fill="#4c9ffe" stroke="#182029" stroke-width="2"/>
+      </g>
+      <rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit"/>
+    </svg><div class="tip" id="tip"></div>${startNote(pts, days)}`;
+    const hit = $("hit"), hov = $("hover"), tip = $("tip");
+    const move = ev => {
+      const r = box.getBoundingClientRect();
+      const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+      const i = Math.max(0, Math.min(pts.length - 1, Math.round((px * W / r.width - m.l) / ((W - m.l - m.r) / (pts.length - 1)))));
+      const p = pts[i], xi = x(i);
+      hov.style.display = "";
+      $("hx").setAttribute("x1", xi); $("hx").setAttribute("x2", xi);
+      $("hv").setAttribute("cx", xi); $("hv").setAttribute("cy", y(p.value));
+      $("hc").setAttribute("cx", xi); $("hc").setAttribute("cy", y(p.cost));
+      const pl = p.value - p.cost;
+      tip.innerHTML = `<b>${new Date(p.t).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}${i === pts.length - 1 ? " (şu an)" : ""}</b>
+        <div class="r"><span>Toplam varlık</span><span>${fmtMoney(p.value, cur)}</span></div>
+        <div class="r"><span>Maliyet</span><span>${fmtMoney(p.cost, cur)}</span></div>
+        <div class="r"><span>Kâr / zarar</span><span class="${cls(pl)}">${fmtMoney(pl, cur, true)}</span></div>`;
+      tip.style.display = "block";
+      const sx = xi * r.width / W, tw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, sx + 12 + tw > r.width ? sx - tw - 12 : sx + 12), r.width - tw) + "px";
+      tip.style.top = "8px";
+    };
+    const leave = () => { hov.style.display = "none"; tip.style.display = "none"; };
+    hit.addEventListener("mousemove", move); hit.addEventListener("touchstart", move, { passive: true });
+    hit.addEventListener("touchmove", move, { passive: true }); hit.addEventListener("mouseleave", leave);
+  }
+  // ---------- günlük toplam kâr/zarar grafiği ----------
+  function drawPLChart() {
+    const box = $("chartPL"), cur = state.viewCur, days = state.chartDays || 90;
+    const base = chartSeries(cur, days);
+    if (!base || base.length < 2) {
+      box.innerHTML = `<div class="status chart-empty">${state.lots.length ? "Grafik verisi yükleniyor…" : "Alım ekleyince grafik burada görünecek."}</div>`;
+      return;
+    }
+    const r0 = state.realized || { amount: 0, cur: "usd" };
+    const realized = convert(r0.amount || 0, r0.cur, cur);
+    const rz = isFinite(realized) ? realized : 0;
+    const pts = base.map(p => ({ t: p.t, pl: p.value - p.cost + rz, un: p.value - p.cost }));
+    const W = Math.max(300, box.clientWidth), H = box.clientHeight || 280;
+    const m = { l: 64, r: 16, t: 10, b: 26 };
+    const vals = pts.map(p => p.pl).concat(0);
+    const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 4);
+    const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+    const x = i => m.l + i * (W - m.l - m.r) / (pts.length - 1);
+    const y = v => m.t + (1 - (v - y0) / (y1 - y0 || 1)) * (H - m.t - m.b);
+    const zy = y(0);
+    const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(p.pl).toFixed(1)).join("");
+    const area = line + `L${x(pts.length - 1).toFixed(1)},${zy.toFixed(1)}L${x(0).toFixed(1)},${zy.toFixed(1)}Z`;
+    const grid = ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#2b3640" stroke-width="1"/>
+      <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" fill="#8b98a5" font-size="11">${v ? fmtShort(v, cur) : "0"}</text>`).join("");
+    const nX = Math.min(W < 520 ? 3 : 6, pts.length), xl = [];
+    for (let k = 0; k < nX; k++) {
+      const i = Math.round(k * (pts.length - 1) / (nX - 1));
+      const d = new Date(pts[i].t);
+      xl.push(`<text x="${x(i)}" y="${H - 6}" text-anchor="${k === 0 ? "start" : k === nX - 1 ? "end" : "middle"}" fill="#8b98a5" font-size="11">${d.toLocaleDateString("tr-TR", days > 1000 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short", year: days > 180 ? "2-digit" : undefined })}</text>`);
+    }
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Günlük toplam kâr/zarar grafiği">
+      <defs>
+        <clipPath id="clipPos"><rect x="0" y="0" width="${W}" height="${zy}"/></clipPath>
+        <clipPath id="clipNeg"><rect x="0" y="${zy}" width="${W}" height="${H - zy}"/></clipPath>
+      </defs>
+      ${grid}${xl.join("")}
+      <path d="${area}" fill="#2ecc71" fill-opacity=".14" clip-path="url(#clipPos)"/>
+      <path d="${area}" fill="#ff5c5c" fill-opacity=".14" clip-path="url(#clipNeg)"/>
+      <line x1="${m.l}" x2="${W - m.r}" y1="${zy}" y2="${zy}" stroke="#8b98a5" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <path d="${line}" fill="none" stroke="#2ecc71" stroke-width="2" stroke-linejoin="round" clip-path="url(#clipPos)"/>
+      <path d="${line}" fill="none" stroke="#ff5c5c" stroke-width="2" stroke-linejoin="round" clip-path="url(#clipNeg)"/>
+      <g id="hover2" style="display:none">
+        <line id="hx2" y1="${m.t}" y2="${H - m.b}" stroke="#8b98a5" stroke-width="1"/>
+        <circle id="hv2" r="5" stroke="#182029" stroke-width="2"/>
+      </g>
+      <rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit2"/>
+    </svg><div class="tip" id="tip2"></div>${startNote(pts, days)}`;
+    const hit = $("hit2"), hov = $("hover2"), tip = $("tip2");
+    const move = ev => {
+      const r = box.getBoundingClientRect();
+      const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+      const i = Math.max(0, Math.min(pts.length - 1, Math.round((px * W / r.width - m.l) / ((W - m.l - m.r) / (pts.length - 1)))));
+      const p = pts[i], xi = x(i);
+      hov.style.display = "";
+      $("hx2").setAttribute("x1", xi); $("hx2").setAttribute("x2", xi);
+      $("hv2").setAttribute("cx", xi); $("hv2").setAttribute("cy", y(p.pl));
+      $("hv2").setAttribute("fill", p.pl >= 0 ? "#2ecc71" : "#ff5c5c");
+      tip.innerHTML = `<b>${new Date(p.t).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}${i === pts.length - 1 ? " (şu an)" : ""}</b>
+        <div class="r"><span>Toplam kâr / zarar</span><span class="${cls(p.pl)}">${fmtMoney(p.pl, cur, true)}</span></div>
+        <div class="r"><span>Elindekiler</span><span class="${cls(p.un)}">${fmtMoney(p.un, cur, true)}</span></div>
+        <div class="r"><span>Gerçekleşen</span><span class="${cls(rz)}">${fmtMoney(rz, cur, true)}</span></div>`;
+      tip.style.display = "block";
+      const sx = xi * r.width / W, tw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, sx + 12 + tw > r.width ? sx - tw - 12 : sx + 12), r.width - tw) + "px";
+      tip.style.top = "8px";
+    };
+    const leave = () => { hov.style.display = "none"; tip.style.display = "none"; };
+    hit.addEventListener("mousemove", move); hit.addEventListener("touchstart", move, { passive: true });
+    hit.addEventListener("touchmove", move, { passive: true }); hit.addEventListener("mouseleave", leave);
+  }
+
+  const onRange = e => {
+    const b = e.target.closest("button[data-r]"); if (!b) return;
+    state.chartDays = +b.dataset.r; save(); drawChart(); drawPLChart();
+  };
+  $("rangeBtns").addEventListener("click", onRange);
+  $("rangeBtns2").addEventListener("click", onRange);
+  // Üst 3 kutudaki tutarları, kutuya sığan en büyük (ve üçü de aynı) yazı boyutuna getir
+  function fitHead() {
+    const els = ["hourPL", "dayPL", "grandPL"].map($);
+    const MAX = window.innerWidth <= 560 ? 32 : 28, MIN = 10;
+    els.forEach(el => el.style.fontSize = "100px");
+    let size = MAX;
+    for (const el of els) {
+      const box = el.parentElement, cs = getComputedStyle(box);
+      const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const w = el.scrollWidth;
+      if (w > 0 && avail > 0) size = Math.min(size, Math.floor(avail / w * 100 * 0.98));
+    }
+    size = Math.max(MIN, size);
+    els.forEach(el => el.style.fontSize = size + "px");
+  }
+  let resizeT; window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { fitHead(); drawChart(); drawPLChart(); }, 150); });
+
+  // ---------- coin seçimi: piyasa değerine göre ilk 100 (CoinGecko) + Binancete USDT paritesi olanlar ----------
+  const input = $("coinInput"), listEl = $("coinList");
+  const TOP_KEY = "kripto-top1000";
+  let TOP = [];             // [{ id, symbol, name, rank }]
+  let chosenCoin = null, listItems = [], listSel = -1;
+  async function loadTop(force) {
+    try {
+      const c = JSON.parse(localStorage.getItem(TOP_KEY));
+      if (c && c.list && c.list.length) { TOP = c.list; if (!force && Date.now() - c.t < 12 * 3600000) return; }
+    } catch (e) {}
+    try {
+      // Piyasa değerine göre ilk 1000: 250 lik 4 sayfa
+      let gecko = [];
+      for (let page = 1; page <= 4; page++) {
+        try {
+          const r = await fetch("https:/" + "/api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=" + page);
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          gecko = gecko.concat(await r.json());
+        } catch (e) { if (page === 1) throw e; break; }
+      }
+      const onBinance = new Set((await binanceGet("/api/v3/ticker/price")).map(t => t.symbol));
+      const list = [], seen = {};
+      for (const g of gecko) {
+        const sym = String(g.symbol || "").toUpperCase();
+        const keep = sym === "USDT" || sym === "USDC";
+        const stable = !keep && g.current_price > 0.97 && g.current_price < 1.03 && /USD|DAI|^U$|EUR/.test(sym + " " + String(g.name).toUpperCase());
+        if (!sym || seen[sym] || stable || !(sym === "USDT" || onBinance.has(sym + "USDT"))) continue;
+        seen[sym] = 1;
+        list.push({ id: sym, symbol: sym, name: g.name, rank: g.market_cap_rank });
+      }
+      if (list.length) { TOP = list; try { localStorage.setItem(TOP_KEY, JSON.stringify({ t: Date.now(), list })); } catch (e) {} }
+    } catch (e) {}
+  }
+  // Listede gösterilecek coinler: ilk 100 + elinde olup listede olmayanlar
+  function pickable() {
+    const out = TOP.slice(), have = new Set(TOP.map(c => c.id));
+    for (const c of COINS) if (!have.has(c.id)) out.push({ id: c.id, symbol: c.symbol, name: c.name, rank: null });
+    return out;
+  }
+  const lc = s => String(s).toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
+  function showList() {
+    const q = lc(input.value.trim());
+    const all = pickable();
+    let items;
+    if (!q) items = all;
+    else {
+      const score = c => {
+        const sym = lc(c.symbol), nm = lc(c.name);
+        if (sym === q) return 0;
+        if (sym.startsWith(q)) return 1;
+        if (nm.startsWith(q)) return 2;
+        if (nm.split(/[\s-]+/).some(w => w.startsWith(q))) return 3;
+        if (sym.includes(q) || nm.includes(q)) return 4;
+        return 9;
+      };
+      items = all.map(c => [score(c), c]).filter(x => x[0] < 9)
+        .sort((a, b) => a[0] - b[0] || (a[1].rank || 999) - (b[1].rank || 999)).map(x => x[1]);
+    }
+    listItems = items; listSel = items.length ? 0 : -1;
+    listEl.innerHTML = items.length
+      ? items.map((c, i) => `<div data-i="${i}" class="${i === 0 ? "sel" : ""}"><span class="rk">${c.rank ? "#" + c.rank : "•"}</span><b>${esc(c.symbol)}</b><span class="nm">${esc(c.name)}</span></div>`).join("")
+      : `<div class="none">${TOP.length ? "Eşleşen coin yok" : "Coin listesi yükleniyor…"}</div>`;
+    listEl.classList.add("open");
+  }
+  function hideList() { listEl.classList.remove("open"); }
+  function pickCoin(c) {
+    chosenCoin = c; input.value = `${c.symbol} – ${c.name}`; hideList();
+    $("amountInput").focus();
+  }
+  function moveSel(d) {
+    if (!listItems.length) return;
+    listSel = (listSel + d + listItems.length) % listItems.length;
+    [...listEl.children].forEach((el, i) => el.classList.toggle("sel", i === listSel));
+    const el = listEl.children[listSel]; if (el) el.scrollIntoView({ block: "nearest" });
+  }
+  input.addEventListener("focus", () => { if (chosenCoin) input.select(); showList(); });
+  input.addEventListener("input", () => { chosenCoin = null; showList(); });
+  input.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") { e.preventDefault(); if (!listEl.classList.contains("open")) showList(); else moveSel(1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); moveSel(-1); }
+    else if (e.key === "Enter" && listEl.classList.contains("open")) { e.preventDefault(); if (listItems[listSel]) pickCoin(listItems[listSel]); }
+    else if (e.key === "Escape") hideList();
+  });
+  listEl.addEventListener("mousedown", e => {
+    e.preventDefault();
+    const d = e.target.closest("div[data-i]"); if (d) pickCoin(listItems[+d.dataset.i]);
+  });
+  input.addEventListener("blur", () => setTimeout(hideList, 150));
+  // Yazılan metni coine çevir (listeden seçmeden yazıp Ekleye basarsa)
+  function resolveCoin() {
+    if (chosenCoin) return chosenCoin;
+    const q = lc(input.value.trim().split(/\s[–-]\s/)[0]);
+    if (!q) return null;
+    return pickable().find(c => lc(c.symbol) === q) || pickable().find(c => lc(c.name) === q) || null;
+  }
+
+  // ---------- portföyler ----------
+  function renderPortfolios() {
+    if (pfDrag) return; // sürükleme sırasında yeniden çizme
+    const bar = $("pfBar");
+    bar.innerHTML = state.portfolios.map(p =>
+      `<button data-pf="${esc(p.id)}" class="${p.id === state.active ? "on" : ""}">${esc(p.name)}</button>`).join("") +
+      `<button class="pf-add" data-pfact="add">＋ Portföy ekle</button>` +
+      `<button class="pf-tool" data-pfact="rename" title="Bu portföyün adını değiştir">✎ Adını değiştir</button>` +
+      (state.portfolios.length > 1 ? `<button class="pf-tool" data-pfact="delete" title="Bu portföyü sil">🗑 Sil</button>` : "");
+  }
+  function switchPortfolio(id) {
+    if (id === state.active) return;
+    syncActive();
+    const p = state.portfolios.find(x => x.id === id); if (!p) return;
+    state.active = id; state.lots = p.lots || (p.lots = []); state.realized = p.realized || { amount: 0, cur: "usd" };
+    save(); render();
+  }
+  // Portföy düğmelerini basılı tutup sürükleyerek sırala (fare: hemen, dokunmatik: uzun basınca)
+  let pfDrag = null, pfJustDragged = false;
+  $("pfBar").addEventListener("pointerdown", e => {
+    const b = e.target.closest("button[data-pf]"); if (!b || e.button > 0) return;
+    const d = { el: b, x: e.clientX, y: e.clientY, id: e.pointerId, on: false, timer: null };
+    if (e.pointerType !== "mouse") d.timer = setTimeout(() => startDrag(d), 350);
+    pfPending = d;
+  });
+  let pfPending = null;
+  function startDrag(d) {
+    if (pfPending !== d) return;
+    d.on = true; pfDrag = d;
+    try { d.el.setPointerCapture(d.id); } catch (e) {}
+    d.el.classList.add("dragging"); document.body.classList.add("pf-drag");
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) {}
+  }
+  window.addEventListener("pointermove", e => {
+    const d = pfPending; if (!d || e.pointerId !== d.id) return;
+    if (!d.on) {
+      const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y);
+      if (e.pointerType === "mouse" && moved > 5) startDrag(d);
+      else if (moved > 10) { clearTimeout(d.timer); pfPending = null; return; }
+      if (!d.on) return;
+    }
+    e.preventDefault();
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    const t = over && over.closest && over.closest("#pfBar button[data-pf]");
+    if (!t || t === d.el) return;
+    const r = t.getBoundingClientRect();
+    const after = e.clientX > r.left + r.width / 2;
+    t.parentNode.insertBefore(d.el, after ? t.nextSibling : t);
+  }, { passive: false });
+  function endDrag(e) {
+    const d = pfPending; if (!d || (e && e.pointerId !== d.id)) return;
+    clearTimeout(d.timer); pfPending = null;
+    if (!d.on) return;
+    pfDrag = null; pfJustDragged = true; setTimeout(() => pfJustDragged = false, 50);
+    d.el.classList.remove("dragging"); document.body.classList.remove("pf-drag");
+    const order = [...$("pfBar").querySelectorAll("button[data-pf]")].map(x => x.dataset.pf);
+    const before = state.portfolios.map(p => p.id).join();
+    state.portfolios.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    if (state.portfolios.map(p => p.id).join() !== before) save();
+    render();
+  }
+  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointercancel", endDrag);
+  $("pfBar").addEventListener("touchmove", e => { if (pfDrag) e.preventDefault(); }, { passive: false });
+  $("pfBar").addEventListener("contextmenu", e => { if (pfDrag || pfPending) e.preventDefault(); });
+  $("pfBar").addEventListener("click", e => {
+    if (pfJustDragged) { e.preventDefault(); return; }
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.pf) return switchPortfolio(b.dataset.pf);
+    const act = b.dataset.pfact, cur = state.portfolios.find(p => p.id === state.active);
+    if (act === "add") {
+      const name = (prompt("Yeni portföyün adı:", "Portföy " + (state.portfolios.length + 1)) || "").trim();
+      if (!name) return;
+      syncActive();
+      const p = { id: uid(), name, lots: [], realized: { amount: 0, cur: state.viewCur } };
+      state.portfolios.push(p);
+      switchPortfolio(p.id);
+    } else if (act === "rename" && cur) {
+      const name = (prompt("Portföyün yeni adı:", cur.name) || "").trim();
+      if (!name) return;
+      cur.name = name; save(); render();
+    } else if (act === "delete" && cur && state.portfolios.length > 1) {
+      if (!confirm(`"${cur.name}" portföyü ve içindeki ${state.lots.length} alım silinsin mi? Bu geri alınamaz.`)) return;
+      state.portfolios = state.portfolios.filter(p => p.id !== cur.id);
+      const next = state.portfolios[0];
+      state.active = next.id; state.lots = next.lots || (next.lots = []); state.realized = next.realized || { amount: 0, cur: "usd" };
+      save(); render();
+    }
+  });
+
+  // ---------- alım ekleme ----------
+  let pendingLot = null;
+  function clearForm() {
+    $("amountInput").value = ""; $("priceInput").value = ""; $("dateInput").value = "";
+    chosenCoin = null; input.value = "";
+  }
+  $("addForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const chosen = resolveCoin();
+    if (!chosen) { alert("Listeden bir coin seç."); input.focus(); return; }
+    const amount = num($("amountInput").value), price = num($("priceInput").value);
+    if (!(amount > 0)) { alert("Miktar sıfırdan büyük bir sayı olmalı."); return; }
+    if (!(price >= 0)) { alert("Alış fiyatı geçerli bir sayı olmalı."); return; }
+    const lot = {
+      id: uid(), coinId: chosen.id, symbol: chosen.symbol, name: chosen.name,
+      amount, price, cur: $("curInput").value, date: $("dateInput").value || ""
+    };
+    const existing = state.lots.filter(l => l.coinId === lot.coinId);
+    if (!existing.length) { state.lots.push(lot); save(); render(); clearForm(); return; }
+
+    // Bu coinden zaten var: kullanıcıya sor
+    pendingLot = lot;
+    const target = existing[0].cur;
+    const exAmt = existing.reduce((s, l) => s + l.amount, 0);
+    const exCost = existing.reduce((s, l) => s + convert(l.amount * l.price, l.cur, target), 0);
+    const newCost = convert(lot.amount * lot.price, lot.cur, target);
+    const avg = (exCost + newCost) / (exAmt + lot.amount);
+    $("mergeTitle").textContent = `Elinde zaten ${chosen.symbol} var`;
+    $("mergeText").innerHTML =
+      `Mevcut: <b>${fmtNum(exAmt)} ${chosen.symbol}</b>` +
+      (existing.length > 1 ? ` (${existing.length} ayrı kalem)` : "") +
+      `, ortalama ${fmtMoney(exCost / exAmt, target)}<br>` +
+      `Yeni alım: <b>${fmtNum(lot.amount)} ${chosen.symbol}</b>, ${fmtMoney(lot.price, lot.cur)}<br><br>` +
+      (isFinite(avg)
+        ? `Ortalamaya katarsan tek kalem olur: <b>${fmtNum(exAmt + lot.amount)} ${chosen.symbol}</b>, ortalama <b>${fmtMoney(avg, target)}</b>`
+        : `Para birimleri farklı ve kur alınamadığı için şu an ortalamaya katılamıyor; ayrı kalem olarak ekleyebilirsin.`);
+    $("mergeBtn").disabled = !isFinite(avg);
+    $("mergeDlg").showModal();
+  });
+
+  $("mergeDlg").addEventListener("close", () => {
+    const choice = $("mergeDlg").returnValue, lot = pendingLot;
+    pendingLot = null;
+    if (!lot || choice === "cancel" || !choice) return;
+    if (choice === "separate") {
+      state.lots.push(lot);
+    } else if (choice === "merge") {
+      const existing = state.lots.filter(l => l.coinId === lot.coinId);
+      const target = existing[0].cur;
+      const all = existing.concat(lot);
+      const amount = all.reduce((s, l) => s + l.amount, 0);
+      const cost = all.reduce((s, l) => s + convert(l.amount * l.price, l.cur, target), 0);
+      if (!isFinite(cost)) { alert("Kur alınamadığı için birleştirilemedi."); return; }
+      const dates = all.map(l => l.date).filter(Boolean).sort();
+      const merged = Object.assign({}, existing[0], { amount, price: cost / amount, cur: target, date: dates[0] || "" });
+      state.lots = state.lots.filter(l => l.coinId !== lot.coinId);
+      state.lots.push(merged);
+    }
+    save(); render(); clearForm();
+  });
+
+  // ---------- tablo tıklamaları ----------
+  let editingId = null, manualCoin = null;
+  $("tbody").addEventListener("click", e => {
+    const btn = e.target.closest("button");
+    if (btn) {
+      e.stopPropagation();
+      const act = btn.dataset.act;
+      if (act === "del") {
+        const l = state.lots.find(x => x.id === btn.dataset.id);
+        if (l && confirm(`${l.name} – ${fmtNum(l.amount)} adetlik alım silinsin mi?`)) {
+          state.lots = state.lots.filter(x => x.id !== l.id); save(); render();
+        }
+      } else if (act === "edit") {
+        const l = state.lots.find(x => x.id === btn.dataset.id); if (!l) return;
+        editingId = l.id;
+        $("editTitle").textContent = `${l.name} alımını düzenle`;
+        $("eAmount").value = String(l.amount).replace(".", ",");
+        $("ePrice").value = String(l.price).replace(".", ",");
+        $("eCur").value = l.cur; $("eDate").value = l.date || "";
+        $("editDlg").showModal();
+      } else if (act === "manual") {
+        manualCoin = btn.dataset.coin;
+        const m = state.manual[manualCoin];
+        const g = state.lots.find(x => x.coinId === manualCoin);
+        $("manualTitle").textContent = `${g ? g.name : manualCoin} – manuel fiyat`;
+        $("mPrice").value = m ? String(m.price).replace(".", ",") : "";
+        $("mCur").value = m ? m.cur : state.viewCur;
+        $("manualDlg").showModal();
+      }
+      return;
+    }
+  });
+
+  $("editDlg").addEventListener("close", () => {
+    if ($("editDlg").returnValue !== "ok" || !editingId) return;
+    const l = state.lots.find(x => x.id === editingId); editingId = null; if (!l) return;
+    const a = num($("eAmount").value), p = num($("ePrice").value);
+    if (!(a > 0) || !(p >= 0)) { alert("Geçersiz değer, değişiklik kaydedilmedi."); return; }
+    Object.assign(l, { amount: a, price: p, cur: $("eCur").value, date: $("eDate").value || "" });
+    save(); render();
+  });
+  $("manualDlg").addEventListener("close", () => {
+    if ($("manualDlg").returnValue !== "ok" || !manualCoin) return;
+    const v = $("mPrice").value.trim();
+    if (!v) delete state.manual[manualCoin];
+    else {
+      const p = num(v);
+      if (!(p >= 0)) { alert("Geçersiz fiyat."); return; }
+      state.manual[manualCoin] = { price: p, cur: $("mCur").value };
+    }
+    manualCoin = null; save(); render();
+  });
+
+  // ---------- diğer kontroller ----------
+  $("viewCur").addEventListener("change", e => { state.viewCur = e.target.value; save(); render(); });
+  $("curInput").value = state.viewCur;
+  $("refreshBtn").addEventListener("click", () => { fetchPrices(); fetchWindows(); });
+
+  // Tutarları gizle / göster (bu cihaza özel, senkronize edilmez)
+  function applyPrivacy(on) {
+    document.body.classList.toggle("privacy", on);
+    $("privacyBtn").classList.toggle("on", on);
+    $("privacyBtn").textContent = on ? "👁 Göster" : "👁 Gizle";
+    drawChart(); drawPLChart();
+  }
+  let privacy = false;
+  try { privacy = localStorage.getItem("kripto-gizli") === "1"; } catch (e) {}
+  applyPrivacy(privacy);
+  $("privacyBtn").addEventListener("click", () => {
+    privacy = !privacy; applyPrivacy(privacy);
+    try { localStorage.setItem("kripto-gizli", privacy ? "1" : "0"); } catch (e) {}
+  });
+  // Sadece 4 özet kutusu için ayrı gizleme (bu cihaza özel)
+  function applyMask4(on) {
+    document.querySelector(".cards").classList.toggle("mask4", on);
+    $("mask4Btn").classList.toggle("on", on);
+    $("mask4Btn").textContent = on ? "👁 Göster" : "👁 Gizle";
+  }
+  let mask4 = false;
+  try { mask4 = localStorage.getItem("kripto-gizli4") === "1"; } catch (e) {}
+  applyMask4(mask4);
+  $("mask4Btn").addEventListener("click", () => {
+    mask4 = !mask4; applyMask4(mask4);
+    try { localStorage.setItem("kripto-gizli4", mask4 ? "1" : "0"); } catch (e) {}
+  });
+  $("period").addEventListener("change", e => { state.period = e.target.value; save(); render(); });
+
+  function saveRealized() {
+    const v = $("realizedInput").value.trim().replace("−", "-");
+    const n = v ? num(v) : 0;
+    if (!isFinite(n)) { $("realizedInput").style.borderColor = "var(--red)"; return; }
+    $("realizedInput").style.borderColor = "";
+    state.realized = { amount: n, cur: $("realizedCur").value };
+    save(); render();
+  }
+  $("realizedInput").addEventListener("input", saveRealized);
+  $("realizedInput").addEventListener("blur", render);
+  $("realizedCur").addEventListener("change", saveRealized);
+
+  $("exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `kripto-portfoy-yedek-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      if (!d || !(Array.isArray(d.lots) || Array.isArray(d.portfolios))) throw new Error("Dosya biçimi tanınmadı");
+      if (state.lots.length && !confirm("Mevcut veriler yedekteki verilerle değiştirilecek. Devam edilsin mi?")) return;
+      state = migrate(Object.assign({ viewCur: "usd", manual: {} }, d)); save(); render();
+    } catch (err) { alert("Yedek yüklenemedi: " + err.message); }
+    e.target.value = "";
+  });
+
+  // BTCUSDT grafiği: TradingView ücretsiz gömülü grafik (Binance verisi)
+  function loadTradingView() {
+    const box = $("tvChart"); if (!box || box.dataset.ok) return;
+    box.dataset.ok = "1";
+    const inner = document.createElement("div"); inner.className = "tradingview-widget-container__widget"; inner.style.height = "100%";
+    const wrap = document.createElement("div"); wrap.className = "tradingview-widget-container"; wrap.style.height = "100%";
+    wrap.appendChild(inner);
+    const sc = document.createElement("script");
+    sc.type = "text/javascript"; sc.async = true;
+    sc.src = "https:/" + "/s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+    sc.innerHTML = JSON.stringify({
+      autosize: true, symbol: "BINANCE:BTCUSDT", interval: "60", timezone: "Europe/Istanbul",
+      theme: "dark", style: "1", locale: "tr", backgroundColor: "rgba(24, 32, 41, 1)",
+      gridColor: "rgba(43, 54, 64, 0.6)", allow_symbol_change: true, calendar: false,
+      hide_side_toolbar: false, withdateranges: true, save_image: false, support_host: "https:/" + "/www.tradingview.com"
+    });
+    wrap.appendChild(sc);
+    box.appendChild(wrap);
+  }
+  refreshCoins();
+  render();
+  try { loadTradingView(); } catch (e) {}
+  // Grafik yüksekliğini ekrana sığdır: sayfa en üstteyken grafiğin alt kenarı ekranın altına denk gelsin
+  // (Google Sites içinde de çalışması için görünen alanı IntersectionObserver ile ölçüyoruz)
+  try {
+    const tvBox = $("tvChart"), wrapEl = document.querySelector(".wrap");
+    let lastH = 0;
+    const fitTV = visH => {
+      if (window.innerWidth <= 560 || !visH) { tvBox.style.height = ""; lastH = 0; return; }
+      const top = tvBox.getBoundingClientRect().top + window.scrollY;
+      const h = Math.max(380, Math.min(760, Math.round(visH - top - 14)));
+      if (Math.abs(h - lastH) > 8) { lastH = h; tvBox.style.height = h + "px"; }
+    };
+    const th = []; for (let i = 0; i <= 200; i++) th.push(i / 200);
+    new IntersectionObserver(entries => {
+      const e = entries[entries.length - 1], r = e.intersectionRect;
+      if (window.scrollY < 40 && r.top < 40 && r.height > 200) fitTV(r.height + r.top);
+    }, { threshold: th }).observe(wrapEl);
+  } catch (e) {}
+  loadTop();
+  fetchPrices();
+  setInterval(fetchPrices, 30000);
+  fetchWindows(); setInterval(fetchWindows, 5 * 60000);
+  fetchHistory(); setInterval(fetchHistory, 60 * 60000);
+  $("keySave").addEventListener("click", () => {
+    const k = $("keyInput").value.trim(); if (!k) return;
+    apiKey = k; try { localStorage.setItem(KEY_STORE, k); } catch (e) {}
+    cloudDirty = false; clearTimeout(cloudTimer);
+    $("keyBox").style.display = "none"; $("keyInput").value = "";
+    setSync("☁ Bağlanıyor…"); pullCloud(true);
+  });
+  if (CLOUD) {
+    if (!apiKey) showKeyBox(false);
+    $("storeNote").textContent = "Veriler Google hesabında saklanır; PC ve telefon otomatik senkronize olur.";
+    setSync("☁ Bağlanıyor…");
+    pullCloud(true);
+    setInterval(() => pullCloud(false), 20000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) pullCloud(false); });
+  }
+})();
+</script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});</script>
+</body>
+</html>
