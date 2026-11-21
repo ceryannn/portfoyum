@@ -182,6 +182,9 @@
   .market .c { font-size: 12px; }
   .market > div { display: grid; grid-template-columns: 1fr 1fr; align-items: center; column-gap: 0; }
   .market .l { min-width: 0; overflow: hidden; }
+  .market > div[data-coin] { cursor: pointer; transition: border-color .15s; }
+  .market > div[data-coin]:hover { border-color: var(--muted); }
+  .market > div.tv-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
   .market .d { text-align: right; white-space: nowrap; border-left: 1px solid var(--line); padding-left: 3px; min-width: 0; align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
   .market .d .k { font-size: 10px; color: var(--muted); }
   .market .d .dp { font-size: 12px; font-weight: 600; }
@@ -366,6 +369,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
 
   // Takip edilen coinler: tüm portföylerdeki alımlardan otomatik çıkarılır (Binancete USDT paritesi)
   let COINS = [];
+  let tvSym = "BTC"; // grafikte gösterilen coin
   function refreshCoins() {
     const seen = {};
     for (const pf of state.portfolios) for (const l of (pf.id === state.active ? state.lots : pf.lots) || [])
@@ -710,7 +714,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
       const dp = changePct(c.id, "day");
       const held = state.lots.filter(l => l.coinId === c.id).reduce((s, l) => s + l.amount, 0) * currentPrice(c.id, cur);
       const da = isFinite(dp) && isFinite(held) ? held - held / (1 + dp / 100) : NaN;
-      return `<div><div class="l"><b>${c.symbol}</b><div class="p">${fmtPrice(price, cur)}</div><div class="c ${cls(ch)}">${fmtPct(ch)}</div></div>` +
+      return `<div data-coin="${esc(c.symbol)}" class="${c.symbol === tvSym ? "tv-on" : ""}" title="Grafikte göster"><div class="l"><b>${c.symbol}</b><div class="p">${fmtPrice(price, cur)}</div><div class="c ${cls(ch)}">${fmtPct(ch)}</div></div>` +
         `<div class="d" title="Günlük açılıştan (03:00) bu yana"><div class="k">Gün</div><div class="dp ${cls(dp)}">${fmtPct(dp)}</div><div class="da sens ${cls(da)}">${fmtShortAmt(da, cur)}</div></div></div>`;
     }).join("");
   }
@@ -1410,9 +1414,9 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   });
 
   // BTCUSDT grafiği: TradingView ücretsiz gömülü grafik (Binance verisi)
-  function loadTradingView() {
-    const box = $("tvChart"); if (!box || box.dataset.ok) return;
-    box.dataset.ok = "1";
+  function loadTradingView(sym) {
+    const box = $("tvChart"); if (!box) return;
+    box.innerHTML = "";
     const inner = document.createElement("div"); inner.className = "tradingview-widget-container__widget"; inner.style.height = "100%";
     const wrap = document.createElement("div"); wrap.className = "tradingview-widget-container"; wrap.style.height = "100%";
     wrap.appendChild(inner);
@@ -1420,7 +1424,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     sc.type = "text/javascript"; sc.async = true;
     sc.src = "https:/" + "/s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     sc.innerHTML = JSON.stringify({
-      autosize: true, symbol: "BINANCE:BTCUSDT", interval: "60", timezone: "Europe/Istanbul",
+      autosize: true, symbol: "BINANCE:" + sym + "USDT", interval: "60", timezone: "Europe/Istanbul",
       theme: "dark", style: "1", locale: "tr", backgroundColor: "rgba(24, 32, 41, 1)",
       gridColor: "rgba(43, 54, 64, 0.6)", allow_symbol_change: true, calendar: false,
       hide_side_toolbar: false, withdateranges: true, save_image: false, support_host: "https:/" + "/www.tradingview.com"
@@ -1430,7 +1434,16 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   }
   refreshCoins();
   render();
-  try { loadTradingView(); } catch (e) {}
+  try { loadTradingView(tvSym); } catch (e) {}
+  // Fiyat şeridindeki bir coine basınca grafik o coine geçer (açılışta her zaman BTC)
+  $("market").addEventListener("click", e => {
+    const b = e.target.closest("[data-coin]"); if (!b) return;
+    const sym = b.dataset.coin;
+    if (sym === tvSym || sym === "USDT") return;
+    tvSym = sym;
+    document.querySelectorAll("#market [data-coin]").forEach(x => x.classList.toggle("tv-on", x.dataset.coin === sym));
+    try { loadTradingView(sym); } catch (x) {}
+  });
   // Grafik yüksekliğini ekrana sığdır: sayfa en üstteyken grafiğin alt kenarı ekranın altına denk gelsin
   // (Google Sites içinde de çalışması için görünen alanı IntersectionObserver ile ölçüyoruz)
   try {
