@@ -158,6 +158,10 @@
   header .controls select, header .controls button { padding: 5px 8px; font-size: 13px; }
   header .controls label { font-size: 12px; }
   .head-total .sub:empty { display: none; }
+  .top-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; }
+  .top-row .pf-bar { flex: 1; margin-bottom: 0; }
+  .wake-btn { padding: 5px 12px; font-size: 13px; border-radius: 999px; background: transparent; color: var(--muted); white-space: nowrap; }
+  .wake-btn.on { background: #f5b041; border-color: #f5b041; color: #111; font-weight: 600; }
   .pf-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 14px; }
   .pf-bar button { padding: 5px 12px; font-size: 13px; border-radius: 999px; }
   .pf-bar button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
@@ -206,7 +210,7 @@
     <div class="label" id="keyMsg"></div>
     <div class="key-row"><input id="keyInput" type="password" placeholder="Senkronizasyon anahtarı" autocomplete="off"><button class="primary" id="keySave">Kaydet</button></div>
   </div>
-  <div class="pf-bar" id="pfBar"></div>
+  <div class="top-row"><div class="pf-bar" id="pfBar"></div><button class="wake-btn" id="wakeBtn" title="Program açıkken ekranın kararmasını engeller">☀ Ekran açık kalsın</button></div>
   <header>
     <div class="head-left">
     <div class="card head-total head-day"><div class="label">Son 1 saat</div><div class="value sens" id="hourPL">–</div><div class="sub" id="hourPct"></div></div>
@@ -1466,6 +1470,34 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   setInterval(fetchPrices, 30000);
   fetchWindows(); setInterval(fetchWindows, 5 * 60000);
   fetchHistory(); setInterval(fetchHistory, 60 * 60000);
+  // Ekran açık kalsın: tarayıcının Wake Lock özelliği; seçim bu cihazda hatırlanır
+  let wakeOn = false, wakeLock = null;
+  try { wakeOn = localStorage.getItem("kripto-ekran") === "1"; } catch (e) {}
+  async function requestWake(fromUser) {
+    if (!wakeOn || document.hidden) return;
+    try {
+      if (!("wakeLock" in navigator)) throw new Error("yok");
+      if (wakeLock && !wakeLock.released) return;
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+      setWakeBtn();
+    } catch (e) { setWakeBtn(!!fromUser); }
+  }
+  function setWakeBtn(failed) {
+    const b = $("wakeBtn");
+    b.classList.toggle("on", wakeOn && !failed);
+    b.textContent = !wakeOn ? "☀ Ekran açık kalsın" : failed ? "☀ Bu tarayıcıda çalışmıyor" : "☀ Ekran açık";
+  }
+  $("wakeBtn").addEventListener("click", () => {
+    wakeOn = !wakeOn;
+    try { localStorage.setItem("kripto-ekran", wakeOn ? "1" : "0"); } catch (e) {}
+    if (wakeOn) requestWake(true); else { if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null; }
+    setWakeBtn();
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) requestWake(); });
+  setWakeBtn(); requestWake();
+  // Bazı tarayıcılar (iPad Safari) ilk dokunuştan sonra izin verir
+  document.addEventListener("pointerdown", () => { if (wakeOn && !wakeLock) requestWake(); });
   $("keySave").addEventListener("click", () => {
     const k = $("keyInput").value.trim(); if (!k) return;
     apiKey = k; try { localStorage.setItem(KEY_STORE, k); } catch (e) {}
