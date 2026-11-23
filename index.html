@@ -1470,18 +1470,47 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   setInterval(fetchPrices, 30000);
   fetchWindows(); setInterval(fetchWindows, 5 * 60000);
   fetchHistory(); setInterval(fetchHistory, 60 * 60000);
-  // Ekran açık kalsın: tarayıcının Wake Lock özelliği; seçim bu cihazda hatırlanır
-  let wakeOn = false, wakeLock = null;
+  // Ekran açık kalsın: önce tarayıcının Wake Lock özelliği; iPad/iPhone ya da desteklemeyen tarayıcılarda
+  // görünmez, sessiz, tekrar eden küçük bir video ile ekran açık tutulur. Seçim bu cihazda hatırlanır.
+  const NOSLEEP_MP4 = "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAZzbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAph0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAIQbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAoAAAAUABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABu21pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAXtzdGJsAAAAt3N0c2QAAAAAAAAAAQAAAKdhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2MC4zMS4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP__AAAALWF2Y0MBQsAe_-EAFWdCwB7aewEQAAADABAAAAMAoPFi6gEABWjOA5yAAAAAEHBhc3AAAAABAAAAAQAAABRidHJ0AAAAAAAAC1AAAAtQAAAAGHN0dHMAAAAAAAAAAQAAAAoAAAgAAAAAFHN0c3MAAAAAAAAAAQAAAAEAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAPHN0c3oAAAAAAAAAAAAAAAoAAAKDAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAAOHN0Y28AAAAAAAAACgAABrgAAAlDAAAJVAAACWEAAAlyAAAJfwAACZAAAAmdAAAJrgAACb8AAAMFdHJhawAAAFx0a2hkAAAAAwAAAAAAAAAAAAAAAgAAAAAAAAfQAAAAAAAAAAAAAAABAQAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAJGVkdHMAAAAcZWxzdAAAAAAAAAABAAAH0AAABAAAAQAAAAACfW1kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAAH0AAAEKAVcQAAAAAAC1oZGxyAAAAAAAAAABzb3VuAAAAAAAAAAAAAAAAU291bmRIYW5kbGVyAAAAAihtaW5mAAAAEHNtaGQAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAexzdGJsAAAAfnN0c2QAAAAAAAAAAQAAAG5tcDRhAAAAAAAAAAEAAAAAAAAAAAABABAAAAAAH0AAAAAAADZlc2RzAAAAAAOAgIAlAAIABICAgBdAFQAAAAAAH0AAAAE_BYCAgAUViFblAAaAgIABAgAAABRidHJ0AAAAAAAAH0AAAAE_AAAAIHN0dHMAAAAAAAAAAgAAABAAAAQAAAAAAQAAAoAAAAB8c3RzYwAAAAAAAAAJAAAAAQAAAAEAAAABAAAAAgAAAAIAAAABAAAABAAAAAEAAAABAAAABQAAAAIAAAABAAAABgAAAAEAAAABAAAABwAAAAIAAAABAAAACAAAAAEAAAABAAAACQAAAAIAAAABAAAACwAAAAEAAAABAAAAWHN0c3oAAAAAAAAAAAAAABEAAAAVAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAADxzdGNvAAAAAAAAAAsAAAajAAAJOwAACUwAAAldAAAJagAACXsAAAmIAAAJmQAACaYAAAm3AAAJyAAAABpzZ3BkAQAAAHJvbGwAAAACAAAAAf__AAAAHHNiZ3AAAAAAcm9sbAAAAAEAAAARAAAAAQAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAAABMYXZmNjAuMTYuMTAwAAAACGZyZWUAAAMxbWRhdN4CAExhdmM2MC4zMS4xMDIAAjBADgAAAm0GBf__adxF6b3m2Ui3lizYINkj7u94MjY0IC0gY29yZSAxNjQgcjMxMDggMzFlMTlmOSAtIEguMjY0L01QRUctNCBBVkMgY29kZWMgLSBDb3B5bGVmdCAyMDAzLTIwMjMgLSBodHRwOi8vd3d3LnZpZGVvbGFuLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0wIHJlZj0xIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDE6MHgxIG1lPWhleCBzdWJtZT0yIHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTAgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0wIDh4OGRjdD0wIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PTAgdGhyZWFkcz0xIGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAga2V5aW50PTI1MCBrZXlpbnRfbWluPTUgc2NlbmVjdXQ9NDAgaW50cmFfcmVmcmVzaD0wIHJjX2xvb2thaGVhZD0xMCByYz1jcmYgbWJ0cmVlPTEgY3JmPTQwLjAgcWNvbXA9MC42MCBxcG1pbj0wIHFwbWF4PTY5IHFwc3RlcD00IGlwX3JhdGlvPTEuNDAgYXE9MToxLjAwAIAAAAAOZYiEBH___w9FAAEEP4ABGCAHARggBwAAAAVBmiAR9QEYIAcBGCAHAAAABUGaQBH1ARggBwAAAAVBmmAR9QEYIAcBGCAHAAAABUGagBH1ARggBwAAAAVBmqAR9QEYIAcBGCAHAAAABUGawBH1ARggBwAAAAVBmuAR9QEYIAcBGCAHAAAABUGbABD1ARggBwEYIAcAAAAFQZsgP9QBGCAH";
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let wakeOn = false, wakeLock = null, wakeVid = null, vidOk = false;
   try { wakeOn = localStorage.getItem("kripto-ekran") === "1"; } catch (e) {}
+  async function playVideo() {
+    if (!wakeVid) {
+      const v = document.createElement("video");
+      v.setAttribute("playsinline", ""); v.setAttribute("webkit-playsinline", ""); v.setAttribute("muted", "");
+      v.muted = true; v.loop = true; v.setAttribute("aria-hidden", "true");
+      v.style.cssText = "position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1";
+      v.src = "data:video/mp4;base64," + NOSLEEP_MP4.replace(/-/g, "+").replace(/_/g, "/");
+      document.body.appendChild(v); wakeVid = v;
+    }
+    await wakeVid.play();
+    vidOk = true;
+  }
   async function requestWake(fromUser) {
     if (!wakeOn || document.hidden) return;
-    try {
-      if (!("wakeLock" in navigator)) throw new Error("yok");
-      if (wakeLock && !wakeLock.released) return;
-      wakeLock = await navigator.wakeLock.request("screen");
-      wakeLock.addEventListener("release", () => { wakeLock = null; });
-      setWakeBtn();
-    } catch (e) { setWakeBtn(!!fromUser); }
+    let ok = false;
+    if ("wakeLock" in navigator) {
+      try {
+        if (!wakeLock || wakeLock.released) {
+          wakeLock = await navigator.wakeLock.request("screen");
+          wakeLock.addEventListener("release", () => { wakeLock = null; });
+        }
+        ok = true;
+      } catch (e) {}
+    }
+    if (!wakeOn) { releaseWake(); return; }
+    if (!ok || isIOS) {
+      try { await playVideo(); ok = true; } catch (e) { if (vidOk && wakeVid && !wakeVid.paused) ok = true; }
+    }
+    if (!wakeOn) { releaseWake(); return; }
+    setWakeBtn(!ok && !!fromUser);
+  }
+  function releaseWake() {
+    if (wakeLock) wakeLock.release().catch(() => {});
+    wakeLock = null;
+    if (wakeVid) wakeVid.pause();
   }
   function setWakeBtn(failed) {
     const b = $("wakeBtn");
@@ -1491,13 +1520,13 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   $("wakeBtn").addEventListener("click", () => {
     wakeOn = !wakeOn;
     try { localStorage.setItem("kripto-ekran", wakeOn ? "1" : "0"); } catch (e) {}
-    if (wakeOn) requestWake(true); else { if (wakeLock) wakeLock.release().catch(() => {}); wakeLock = null; }
     setWakeBtn();
+    if (wakeOn) requestWake(true); else releaseWake();
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) requestWake(); });
   setWakeBtn(); requestWake();
-  // Bazı tarayıcılar (iPad Safari) ilk dokunuştan sonra izin verir
-  document.addEventListener("pointerdown", () => { if (wakeOn && !wakeLock) requestWake(); });
+  // Bazı tarayıcılar (iPad Safari) ancak ilk dokunuştan sonra izin verir
+  document.addEventListener("pointerdown", e => { if (e.target.closest && e.target.closest("#wakeBtn")) return; if (wakeOn && (!wakeLock || (isIOS && (!wakeVid || wakeVid.paused)))) requestWake(); });
   $("keySave").addEventListener("click", () => {
     const k = $("keyInput").value.trim(); if (!k) return;
     apiKey = k; try { localStorage.setItem(KEY_STORE, k); } catch (e) {}
