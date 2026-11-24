@@ -258,6 +258,18 @@
 
   <div class="panel">
     <div class="chart-head">
+      <h2>Günlük açılıştan – gün sonu</h2>
+      <div class="range" id="rangeBtns3">
+        <button class="small" data-r="30">1 ay</button><button class="small" data-r="90">3 ay</button><button class="small" data-r="365">1 yıl</button><button class="small" data-r="1095">3 yıl</button><button class="small" data-r="1825">5 yıl</button><button class="small" data-r="3650">10 yıl</button>
+      </div>
+    </div>
+    <div class="legend"><span><i class="sw sw-g"></i>Günü kârla kapattı</span><span><i class="sw sw-r"></i>Günü zararla kapattı</span><span><i class="sw sw-c"></i>Sıfır çizgisi</span></div>
+    <div id="chartDay" class="chart"><div class="status chart-empty">Grafik yükleniyor…</div></div>
+    <div class="hint">Her mum bir gün (03:00 – 03:00): gövde o günün açılışından gün sonuna kadarki kâr/zarar, fitiller gün içinde görülen en yüksek ve en düşük seviye (yaklaşık). Son mum bugün, canlı.</div>
+  </div>
+
+  <div class="panel">
+    <div class="chart-head">
       <h2>Toplam kâr / zarar – günlük</h2>
       <div class="range" id="rangeBtns2">
         <button class="small" data-r="30">1 ay</button><button class="small" data-r="90">3 ay</button><button class="small" data-r="365">1 yıl</button><button class="small" data-r="1095">3 yıl</button><button class="small" data-r="1825">5 yıl</button><button class="small" data-r="3650">10 yıl</button>
@@ -650,7 +662,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     for (const c of tradable()) {
       try {
         const k = await klinesSince(c.symbol + "USDT", daily[c.id] ? days : 3653);
-        const rows = k.map(r => [r[0], parseFloat(r[4]), parseFloat(r[1])]);
+        const rows = k.map(r => [r[0], parseFloat(r[4]), parseFloat(r[1]), parseFloat(r[2]), parseFloat(r[3])]);
         daily[c.id] = mergeDaily(daily[c.id], rows);
         // son satır = bugünün (devam eden) mumu; N gün önceki kapanış = [son - N]
         const d = daily[c.id], last = d.length - 1, out = {};
@@ -664,7 +676,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     } catch (e) { ok = false; }
     if (COINS.some(c => c.id === "USDT") && !daily.USDT) {
       const today = Math.floor(Date.now() / 86400000) * 86400000, rows = [];
-      for (let i = 3652; i >= 0; i--) rows.push([today - i * 86400000, 1, 1]);
+      for (let i = 3652; i >= 0; i--) rows.push([today - i * 86400000, 1, 1, 1, 1]);
       daily.USDT = rows; pastClose.USDT = { "30d": 1, "90d": 1, "365d": 1 };
     }
     if (ok) historyFull = true;
@@ -821,6 +833,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     $("realizedCur").value = r.cur;
 
     drawChart();
+    drawDayChart();
     drawPLChart();
     // Dönemlere göre portföy değişimi
     const sel = state.period || "24h";
@@ -960,6 +973,96 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     hit.addEventListener("mousemove", move); hit.addEventListener("touchstart", move, { passive: true });
     hit.addEventListener("touchmove", move, { passive: true }); hit.addEventListener("mouseleave", leave);
   }
+  // ---------- günlük açılıştan gün sonu mum grafiği ----------
+  function dayCandles(cur, days) {
+    const ref = state.lots.map(l => daily[l.coinId]).filter(a => a && a.length).sort((a, b) => b.length - a.length)[0];
+    if (!ref || !state.lots.length) return null;
+    const maps = {};
+    for (const id in daily) maps[id] = new Map(daily[id].map(r => [r[0], r]));
+    const out = [];
+    for (const [t] of ref.slice(-days)) {
+      const dayEnd = t + DAY - 1;
+      const fx = cur === "try" ? ((maps.USDTTRY && maps.USDTTRY.get(t)) || [0, usdTry])[1] : 1;
+      let o = 0, c = 0, h = 0, l = 0, held = false, missing = false;
+      for (const lot of state.lots) {
+        if (lot.date && new Date(lot.date + "T00:00").getTime() > dayEnd) continue;
+        held = true;
+        const row = maps[lot.coinId] && maps[lot.coinId].get(t);
+        if (!row || !isFinite(row[2])) { missing = true; continue; }
+        const q = lot.amount * fx, op = row[2], cl = row[1];
+        const hi = isFinite(row[3]) ? row[3] : Math.max(op, cl), lo = isFinite(row[4]) ? row[4] : Math.min(op, cl);
+        o += q * op; c += q * cl; h += q * hi; l += q * lo;
+      }
+      if (!held || missing) continue;
+      out.push({ t, o, c, h, l });
+    }
+    // son mum: canlı fiyatla bugün
+    const today = Math.floor(Date.now() / DAY) * DAY, last = out[out.length - 1];
+    if (last && last.t === today) {
+      const live = summarize(cur).reduce((s, r) => s + r.value, 0);
+      if (isFinite(live)) { last.c = live; last.h = Math.max(last.h, live); last.l = Math.min(last.l, live); }
+    }
+    return out.map(k => ({ t: k.t, d: k.c - k.o, hi: Math.max(0, k.h - k.o, k.c - k.o), lo: Math.min(0, k.l - k.o, k.c - k.o), pct: k.o ? (k.c / k.o - 1) * 100 : NaN, live: k.t === today }));
+  }
+
+  function drawDayChart() {
+    const box = $("chartDay"), cur = state.viewCur, days = state.chartDays || 90;
+    const pts = dayCandles(cur, days);
+    if (!pts || pts.length < 2) {
+      box.innerHTML = `<div class="status chart-empty">${state.lots.length ? "Grafik verisi yükleniyor…" : "Alım ekleyince grafik burada görünecek."}</div>`;
+      return;
+    }
+    const W = Math.max(300, box.clientWidth), H = box.clientHeight || 280;
+    const m = { l: 64, r: 16, t: 10, b: 26 };
+    const vals = pts.flatMap(p => [p.hi, p.lo]).concat(0);
+    const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 4);
+    const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+    const slot = (W - m.l - m.r) / pts.length;
+    const x = i => m.l + (i + 0.5) * slot;
+    const y = v => m.t + (1 - (v - y0) / (y1 - y0 || 1)) * (H - m.t - m.b);
+    const zy = y(0), bw = Math.max(1, Math.min(14, slot * 0.7));
+    const grid = ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="#2b3640" stroke-width="1"/>
+      <text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" fill="#8b98a5" font-size="11">${v ? fmtShort(v, cur) : "0"}</text>`).join("");
+    const nX = Math.min(W < 520 ? 3 : 6, pts.length), xl = [];
+    for (let k = 0; k < nX; k++) {
+      const i = Math.round(k * (pts.length - 1) / (nX - 1));
+      const d = new Date(pts[i].t);
+      xl.push(`<text x="${x(i)}" y="${H - 6}" text-anchor="${k === 0 ? "start" : k === nX - 1 ? "end" : "middle"}" fill="#8b98a5" font-size="11">${d.toLocaleDateString("tr-TR", days > 1000 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short", year: days > 180 ? "2-digit" : undefined })}</text>`);
+    }
+    const candles = pts.map((p, i) => {
+      const col = p.d >= 0 ? "#2ecc71" : "#ff5c5c", xi = x(i).toFixed(1);
+      const top = Math.min(y(p.d), zy), hgt = Math.max(1, Math.abs(y(p.d) - zy));
+      const wick = slot >= 3 ? `<line x1="${xi}" x2="${xi}" y1="${y(p.hi).toFixed(1)}" y2="${y(p.lo).toFixed(1)}" stroke="${col}" stroke-width="1"/>` : "";
+      return `${wick}<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${hgt.toFixed(1)}" fill="${col}"${p.live ? ' fill-opacity=".55"' : ""} rx="${bw > 4 ? 1.5 : 0}"/>`;
+    }).join("");
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Günlük açılıştan gün sonu kâr/zarar mum grafiği">
+      ${grid}${xl.join("")}
+      <line x1="${m.l}" x2="${W - m.r}" y1="${zy}" y2="${zy}" stroke="#8b98a5" stroke-width="1.5" stroke-dasharray="5 4"/>
+      ${candles}
+      <rect id="hb3" y="${m.t}" height="${H - m.t - m.b}" fill="#8b98a5" fill-opacity=".12" style="display:none"/>
+      <rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent" id="hit3"/>
+    </svg><div class="tip" id="tip3"></div>${startNote(pts, days)}`;
+    const hit = $("hit3"), hb = $("hb3"), tip = $("tip3");
+    const move = ev => {
+      const r = box.getBoundingClientRect();
+      const px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+      const i = Math.max(0, Math.min(pts.length - 1, Math.floor((px * W / r.width - m.l) / slot)));
+      const p = pts[i], xi = x(i);
+      hb.style.display = ""; hb.setAttribute("x", xi - slot / 2); hb.setAttribute("width", slot);
+      tip.innerHTML = `<b>${new Date(p.t).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "short" })}${p.live ? " (bugün, canlı)" : ""}</b>
+        <div class="r"><span>Gün sonu</span><span class="${cls(p.d)}">${fmtMoney(p.d, cur, true)} (${fmtPct(p.pct)})</span></div>
+        <div class="r"><span>Gün içi en yüksek</span><span class="${cls(p.hi)}">${fmtMoney(p.hi, cur, true)}</span></div>
+        <div class="r"><span>Gün içi en düşük</span><span class="${cls(p.lo)}">${fmtMoney(p.lo, cur, true)}</span></div>`;
+      tip.style.display = "block";
+      const sx = xi * r.width / W, tw = tip.offsetWidth;
+      tip.style.left = Math.min(Math.max(0, sx + 12 + tw > r.width ? sx - tw - 12 : sx + 12), r.width - tw) + "px";
+      tip.style.top = "8px";
+    };
+    const leave = () => { hb.style.display = "none"; tip.style.display = "none"; };
+    hit.addEventListener("mousemove", move); hit.addEventListener("touchstart", move, { passive: true });
+    hit.addEventListener("touchmove", move, { passive: true }); hit.addEventListener("mouseleave", leave);
+  }
+
   // ---------- günlük toplam kâr/zarar grafiği ----------
   function drawPLChart() {
     const box = $("chartPL"), cur = state.viewCur, days = state.chartDays || 90;
@@ -1033,10 +1136,11 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
 
   const onRange = e => {
     const b = e.target.closest("button[data-r]"); if (!b) return;
-    state.chartDays = +b.dataset.r; save(); drawChart(); drawPLChart();
+    state.chartDays = +b.dataset.r; save(); drawChart(); drawDayChart(); drawPLChart();
   };
   $("rangeBtns").addEventListener("click", onRange);
   $("rangeBtns2").addEventListener("click", onRange);
+  $("rangeBtns3").addEventListener("click", onRange);
   // Üst 3 kutudaki tutarları, kutuya sığan en büyük (ve üçü de aynı) yazı boyutuna getir
   function fitHead() {
     const els = ["hourPL", "dayPL", "grandPL"].map($);
@@ -1052,7 +1156,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     size = Math.max(MIN, size);
     els.forEach(el => el.style.fontSize = size + "px");
   }
-  let resizeT; window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { fitHead(); drawChart(); drawPLChart(); }, 150); });
+  let resizeT; window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { fitHead(); drawChart(); drawDayChart(); drawPLChart(); }, 150); });
 
   // ---------- coin seçimi: piyasa değerine göre ilk 100 (CoinGecko) + Binancete USDT paritesi olanlar ----------
   const input = $("coinInput"), listEl = $("coinList");
@@ -1364,7 +1468,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     document.body.classList.toggle("privacy", on);
     $("privacyBtn").classList.toggle("on", on);
     $("privacyBtn").textContent = on ? "👁 Göster" : "👁 Gizle";
-    drawChart(); drawPLChart();
+    drawChart(); drawDayChart(); drawPLChart();
   }
   let privacy = false;
   try { privacy = localStorage.getItem("kripto-gizli") === "1"; } catch (e) {}
