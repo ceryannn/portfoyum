@@ -160,6 +160,7 @@
   header .controls label { font-size: 12px; }
   .head-total .sub:empty { display: none; }
   .has-hl { display: flex; gap: 8px; align-items: stretch; }
+  @media (min-width: 561px) { .head-hour { flex-grow: 0.75; } .has-hl { flex-grow: 1.4; } }
   .has-hl .hd-main { flex: 1 1 auto; min-width: 0; }
   .hd-hl { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-left: 1px solid var(--line); padding-left: 8px; font-size: 13px; }
   .hd-hl .k { font-size: 11.5px; color: var(--muted); }
@@ -236,7 +237,7 @@
   <div class="top-row"><div class="pf-bar" id="pfBar"></div><button class="wake-btn" id="wakeBtn" title="Program açıkken ekranın kararmasını engeller">☀ Ekran açık kalsın</button></div>
   <header>
     <div class="head-left">
-    <div class="card head-total head-day"><div class="label">Son 1 saat</div><div class="value sens" id="hourPL">–</div><div class="sub" id="hourPct"></div></div>
+    <div class="card head-total head-day head-hour"><div class="label">Son 1 saat</div><div class="value sens" id="hourPL">–</div><div class="sub" id="hourPct"></div></div>
     <div class="card head-total head-day has-hl"><div class="hd-main"><div class="label">Günlük açılıştan</div><div class="value sens" id="dayPL">–</div><div class="sub" id="dayPct"></div></div><div class="hd-hl" id="dayHL" title="Bugün açılıştan bu yana görülen en yüksek ve en düşük kâr/zarar (yaklaşık)"><div class="k">Gün içi</div><div class="r"><span class="t" title="Gün içi en yüksek">▲</span><span class="sens" id="dayHi">–</span></div><div class="r"><span class="t" title="Gün içi en düşük">▼</span><span class="sens" id="dayLo">–</span></div></div></div>
     <div class="card total head-total"><div class="label">TOPLAM kâr / zarar</div><div class="value sens" id="grandPL">–</div><div class="sub status" id="grandPLAlt"></div></div>
     <div class="card head-fng" id="fngBox" title="Kripto Korku ve Açgözlülük Endeksi (alternative.me), günde bir kez güncellenir"><div class="fng-t"><div class="label">Korku / Açgözlülük</div><div class="fng-c" id="fngCls"></div></div><div class="fng-g"><svg viewBox="0 0 104 58" id="fngSvg"></svg><div class="fng-v" id="fngVal">–</div></div></div>
@@ -733,6 +734,12 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   const fmtPrice = (v, cur) => Math.abs(v) >= 1000 && isFinite(v) ? fmtMoney(Math.round(v), cur).replace(/,00(?=\D|$)/, "") : fmtMoney(v, cur);
   // Tabloda 1000 üstü tutarlar küsuratsız
   const fmtBig = (v, cur, sign) => isFinite(v) && Math.abs(v) >= 1000 ? fmtMoney(Math.round(v), cur, sign).replace(/,00(?=\D|$)/, "") : fmtMoney(v, cur, sign);
+  function fmtWholeAmt(v, cur) {
+    if (!isFinite(v)) return "";
+    const sym = cur === "usd" ? "$" : "₺", n = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(Math.abs(v));
+    const sign = v < 0 ? "−" : v > 0 ? "+" : "";
+    return cur === "usd" ? sign + sym + n : sign + n + " " + sym;
+  }
   function fmtShortAmt(v, cur) {
     if (!isFinite(v)) return "";
     const a = Math.abs(v), sym = cur === "usd" ? "$" : "₺";
@@ -879,9 +886,9 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
       const today = Math.floor(Date.now() / 86400000) * 86400000;
       let hi = isFinite(amt) ? amt : NaN, lo = hi;
       if (t && t.t === today) { hi = isFinite(hi) ? Math.max(hi, t.hi) : t.hi; lo = isFinite(lo) ? Math.min(lo, t.lo) : t.lo; }
-      $("dayHi").textContent = isFinite(hi) ? fmtShortAmt(hi, cur) : "–";
+      $("dayHi").textContent = isFinite(hi) ? fmtWholeAmt(hi, cur) : "–";
       $("dayHi").className = "sens " + (isFinite(hi) ? cls(hi) : "");
-      $("dayLo").textContent = isFinite(lo) ? fmtShortAmt(lo, cur) : "–";
+      $("dayLo").textContent = isFinite(lo) ? fmtWholeAmt(lo, cur) : "–";
       $("dayLo").className = "sens " + (isFinite(lo) ? cls(lo) : "");
     }
     fitHead();
