@@ -235,6 +235,18 @@
   </header>
 
   <div class="market" id="market"></div>
+  <div class="panel">
+    <div class="chart-head">
+      <h2>Günlük açılıştan – gün sonu</h2>
+      <div class="range" id="rangeBtns3">
+        <button class="small" data-r="30">1 ay</button><button class="small" data-r="90">3 ay</button><button class="small" data-r="365">1 yıl</button><button class="small" data-r="1095">3 yıl</button><button class="small" data-r="1825">5 yıl</button><button class="small" data-r="3650">10 yıl</button>
+      </div>
+    </div>
+    <div class="legend"><span><i class="sw sw-g"></i>Günü kârla kapattı</span><span><i class="sw sw-r"></i>Günü zararla kapattı</span><span><i class="sw sw-c"></i>Sıfır çizgisi</span></div>
+    <div id="chartDay" class="chart"><div class="status chart-empty">Grafik yükleniyor…</div></div>
+    <div class="hint">Her mum bir gün (03:00 – 03:00): gövde o günün açılışından gün sonuna kadarki kâr/zarar, fitiller gün içinde görülen en yüksek ve en düşük seviye (yaklaşık). Son mum bugün, canlı.</div>
+  </div>
+
   <div class="card tv-card"><div id="tvChart" class="tv-chart"></div></div>
 
   <div class="cards">
@@ -254,18 +266,6 @@
       <div class="chg-grid" id="chgBody"></div>
       <div class="sub status chg-note">Elindeki miktarlar o tarihte de aynı olsaydı ne kadar değişirdi (USDT bazında). * işareti: bazı coinlerin o döneme ait verisi yok.</div>
     </div>
-  </div>
-
-  <div class="panel">
-    <div class="chart-head">
-      <h2>Günlük açılıştan – gün sonu</h2>
-      <div class="range" id="rangeBtns3">
-        <button class="small" data-r="30">1 ay</button><button class="small" data-r="90">3 ay</button><button class="small" data-r="365">1 yıl</button><button class="small" data-r="1095">3 yıl</button><button class="small" data-r="1825">5 yıl</button><button class="small" data-r="3650">10 yıl</button>
-      </div>
-    </div>
-    <div class="legend"><span><i class="sw sw-g"></i>Günü kârla kapattı</span><span><i class="sw sw-r"></i>Günü zararla kapattı</span><span><i class="sw sw-c"></i>Sıfır çizgisi</span></div>
-    <div id="chartDay" class="chart"><div class="status chart-empty">Grafik yükleniyor…</div></div>
-    <div class="hint">Her mum bir gün (03:00 – 03:00): gövde o günün açılışından gün sonuna kadarki kâr/zarar, fitiller gün içinde görülen en yüksek ve en düşük seviye (yaklaşık). Son mum bugün, canlı.</div>
   </div>
 
   <div class="panel">
