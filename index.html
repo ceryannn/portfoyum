@@ -159,6 +159,28 @@
   header .controls select, header .controls button { padding: 5px 8px; font-size: 13px; }
   header .controls label { font-size: 12px; }
   .head-total .sub:empty { display: none; }
+  .has-hl { display: flex; gap: 8px; align-items: stretch; }
+  .has-hl .hd-main { flex: 1 1 auto; min-width: 0; }
+  .hd-hl { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-left: 1px solid var(--line); padding-left: 8px; font-size: 13px; }
+  .hd-hl .k { font-size: 11.5px; color: var(--muted); }
+  .hd-hl .r { display: flex; justify-content: space-between; gap: 5px; white-space: nowrap; }
+  .hd-hl .t { color: var(--muted); font-size: 10px; align-self: center; }
+  .hd-hl .sens { font-weight: 600; }
+  @media (max-width: 560px) { .hd-hl { font-size: 15px; } .hd-hl .t, .hd-hl .k { font-size: 13px; } }
+  .head-fng { flex: 0 0 auto; padding: 8px 12px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 128px; }
+  .head-fng .label { font-size: 12px; color: var(--muted); white-space: nowrap; margin-bottom: 2px; }
+  .head-fng .fng-g { position: relative; width: 104px; height: 58px; }
+  .head-fng svg { display: block; width: 104px; height: 58px; }
+  .head-fng .fng-v { position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; font-size: 22px; font-weight: 700; line-height: 1; }
+  .head-fng .fng-c { font-size: 11.5px; color: var(--muted); white-space: nowrap; margin-top: 3px; }
+  .head-fng .fng-t { display: contents; }
+  .head-fng .label { order: 1; } .head-fng .fng-g { order: 2; } .head-fng .fng-c { order: 3; }
+  @media (max-width: 560px) {
+    .head-fng { flex-direction: row; justify-content: space-between; padding: 10px 14px; }
+    .head-fng .fng-t { display: block; }
+    .head-fng .label { font-size: 15px; color: var(--text); margin-bottom: 4px; }
+    .head-fng .fng-c { font-size: 14px; }
+  }
   .top-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; }
   .top-row .pf-bar { flex: 1; margin-bottom: 0; }
   .wake-btn { padding: 5px 12px; font-size: 13px; border-radius: 999px; background: transparent; color: var(--muted); white-space: nowrap; }
@@ -215,8 +237,9 @@
   <header>
     <div class="head-left">
     <div class="card head-total head-day"><div class="label">Son 1 saat</div><div class="value sens" id="hourPL">–</div><div class="sub" id="hourPct"></div></div>
-    <div class="card head-total head-day"><div class="label">Günlük açılıştan</div><div class="value sens" id="dayPL">–</div><div class="sub" id="dayPct"></div></div>
+    <div class="card head-total head-day has-hl"><div class="hd-main"><div class="label">Günlük açılıştan</div><div class="value sens" id="dayPL">–</div><div class="sub" id="dayPct"></div></div><div class="hd-hl" id="dayHL" title="Bugün açılıştan bu yana görülen en yüksek ve en düşük kâr/zarar (yaklaşık)"><div class="k">Gün içi</div><div class="r"><span class="t" title="Gün içi en yüksek">▲</span><span class="sens" id="dayHi">–</span></div><div class="r"><span class="t" title="Gün içi en düşük">▼</span><span class="sens" id="dayLo">–</span></div></div></div>
     <div class="card total head-total"><div class="label">TOPLAM kâr / zarar</div><div class="value sens" id="grandPL">–</div><div class="sub status" id="grandPLAlt"></div></div>
+    <div class="card head-fng" id="fngBox" title="Kripto Korku ve Açgözlülük Endeksi (alternative.me), günde bir kez güncellenir"><div class="fng-t"><div class="label">Korku / Açgözlülük</div><div class="fng-c" id="fngCls"></div></div><div class="fng-g"><svg viewBox="0 0 104 58" id="fngSvg"></svg><div class="fng-v" id="fngVal">–</div></div></div>
     </div>
     <div class="controls">
       <label class="status" for="period">Değişim:</label>
@@ -847,6 +870,19 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
       $(plId).className = "value sens " + (withData.length ? cls(amt) : "");
       $(pctId).textContent = withData.length ? fmtPct(base ? amt / base * 100 : NaN) : "";
       $(pctId).className = "sub " + (withData.length ? cls(amt) : "");
+    }
+    // Gün içi en yüksek ve en düşük kâr/zarar
+    {
+      const withData = known.filter(r => isFinite(r.chg.day));
+      const amt = withData.length ? withData.reduce((s, r) => s + r.chg.day, 0) : NaN;
+      const c = dayCandles(cur, 1), t = c && c[c.length - 1];
+      const today = Math.floor(Date.now() / 86400000) * 86400000;
+      let hi = isFinite(amt) ? amt : NaN, lo = hi;
+      if (t && t.t === today) { hi = isFinite(hi) ? Math.max(hi, t.hi) : t.hi; lo = isFinite(lo) ? Math.min(lo, t.lo) : t.lo; }
+      $("dayHi").textContent = isFinite(hi) ? fmtShortAmt(hi, cur) : "–";
+      $("dayHi").className = "sens " + (isFinite(hi) ? cls(hi) : "");
+      $("dayLo").textContent = isFinite(lo) ? fmtShortAmt(lo, cur) : "–";
+      $("dayLo").className = "sens " + (isFinite(lo) ? cls(lo) : "");
     }
     fitHead();
     $("chgBody").innerHTML = PERIODS.filter(pr => pr.key !== "day" && pr.key !== "1h").map(pr => {
@@ -1573,6 +1609,33 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   } catch (e) {}
   loadTop();
   fetchPrices();
+  // ---------- korku ve açgözlülük endeksi ----------
+  const FNG_TR = { "Extreme Fear": "Aşırı korku", "Fear": "Korku", "Neutral": "Nötr", "Greed": "Açgözlülük", "Extreme Greed": "Aşırı açgözlülük" };
+  const fngColor = v => v < 25 ? "#ff5c5c" : v < 45 ? "#f39c12" : v < 56 ? "#f1c40f" : v < 76 ? "#a3d94c" : "#2ecc71";
+  function drawFng(v, cls, prev) {
+    const cx = 52, cy = 52, R = 44, segs = [[0, 25, "#ff5c5c"], [25, 45, "#f39c12"], [45, 56, "#f1c40f"], [56, 76, "#a3d94c"], [76, 100, "#2ecc71"]];
+    const pt = (val, r) => { const a = Math.PI * (1 - val / 100); return [cx + r * Math.cos(a), cy - r * Math.sin(a)]; };
+    let g = "";
+    for (const [a, b, c] of segs) {
+      const [x1, y1] = pt(a + 1.2, R), [x2, y2] = pt(b - 1.2, R);
+      g += `<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${R},${R} 0 0 1 ${x2.toFixed(1)},${y2.toFixed(1)}" fill="none" stroke="${c}" stroke-width="6" stroke-linecap="round"/>`;
+    }
+    if (isFinite(v)) { const [mx, my] = pt(v, R); g += `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="5.5" fill="#fff" stroke="#182029" stroke-width="2"/>`; }
+    $("fngSvg").innerHTML = g;
+    $("fngVal").textContent = isFinite(v) ? v : "–";
+    $("fngVal").style.color = isFinite(v) ? fngColor(v) : "";
+    $("fngCls").textContent = cls ? (FNG_TR[cls] || cls) + (isFinite(prev) && prev !== v ? " · dün " + prev : "") : "";
+  }
+  async function fetchFng() {
+    try {
+      const r = await fetch("https:/" + "/api.alternative.me/fng/?limit=2");
+      const j = await r.json(), d = j.data || [];
+      if (d[0]) drawFng(+d[0].value, d[0].value_classification, d[1] ? +d[1].value : NaN);
+    } catch (e) {}
+  }
+  drawFng(NaN, "");
+  fetchFng(); setInterval(fetchFng, 30 * 60000);
+
   setInterval(fetchPrices, 30000);
   fetchWindows(); setInterval(fetchWindows, 5 * 60000);
   fetchHistory(); setInterval(fetchHistory, 60 * 60000);
