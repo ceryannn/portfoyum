@@ -883,29 +883,29 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     {
       const withData = known.filter(r => isFinite(r.chg.day));
       const amt = withData.length ? withData.reduce((s, r) => s + r.chg.day, 0) : NaN;
-      const c = dayCandles(cur, 1), t = c && c[c.length - 1];
       const today = Math.floor(Date.now() / 86400000) * 86400000;
       let hi = isFinite(amt) ? amt : NaN, lo = hi;
-      if (t && t.t === today) { hi = isFinite(hi) ? Math.max(hi, t.hi) : t.hi; lo = isFinite(lo) ? Math.min(lo, t.lo) : t.lo; }
-      // Gün içinde görülen canlı değerleri sakla ki en yüksek ve en düşük geri gitmesin
       if (isFinite(amt)) {
-        const sig = state.active + "|" + cur + "|" + state.lots.map(l => l.coinId + ":" + l.amount).join(",");
-        let trk = {};
-        try { trk = JSON.parse(localStorage.getItem("kripto-gunici") || "{}"); } catch (e) {}
-        if (trk.day !== today) trk = { day: today, v: {} };
-        const o = trk.v[sig] || { hi: amt, lo: amt };
-        o.hi = Math.max(o.hi, amt); o.lo = Math.min(o.lo, amt);
-        trk.v[sig] = o;
-        try { localStorage.setItem("kripto-gunici", JSON.stringify(trk)); } catch (e) {}
-        hi = Math.max(hi, o.hi); lo = Math.min(lo, o.lo);
-        // sunucu kaydi (cihazlar kapaliyken de tutulur)
+        // sunucu kaydi: 5 dakikada bir, cihazlar kapaliyken de tutulur; tum cihazlar ayni degeri gorur
         const sk = srvHL && srvHL.day === today && srvHL.pf && srvHL.pf[state.active + "|" + state.lots.map(l => l.coinId + ":" + l.amount).join(",")];
-        if (sk) {
-          const a = cur === "usd" ? sk.u : sk.t;
-          if (a && isFinite(a[0]) && isFinite(a[1])) { hi = Math.max(hi, a[0]); lo = Math.min(lo, a[1]); }
+        const a = sk && (cur === "usd" ? sk.u : sk.t);
+        if (a && isFinite(a[0]) && isFinite(a[1])) {
+          hi = Math.max(hi, a[0]); lo = Math.min(lo, a[1]);
           const mins = Math.round((Date.now() - sk.at) / 60000);
           $("dayHL").title = "Gün içi en yüksek ve en düşük kâr/zarar. Sunucu kaydı: " + (mins <= 1 ? "az önce" : mins + " dk önce") + (mins > 30 ? " (gecikmiş)" : "");
           $("dayHL").querySelector(".k").textContent = mins > 30 ? "Gün içi ⚠" : "Gün içi";
+        } else {
+          // sunucu kaydi yoksa: bu cihazda gorulen canli degerler
+          const sig = state.active + "|" + cur + "|" + state.lots.map(l => l.coinId + ":" + l.amount).join(",");
+          let trk = {};
+          try { trk = JSON.parse(localStorage.getItem("kripto-gunici") || "{}"); } catch (e) {}
+          if (trk.day !== today) trk = { day: today, v: {} };
+          const o = trk.v[sig] || { hi: amt, lo: amt };
+          o.hi = Math.max(o.hi, amt); o.lo = Math.min(o.lo, amt);
+          trk.v[sig] = o;
+          try { localStorage.setItem("kripto-gunici", JSON.stringify(trk)); } catch (e) {}
+          hi = Math.max(hi, o.hi); lo = Math.min(lo, o.lo);
+          $("dayHL").title = "Gün içi en yüksek ve en düşük kâr/zarar (bu cihazda görülen)";
         }
       }
       $("dayHi").textContent = isFinite(hi) ? fmtWholeAmt(hi, cur) : "–";
