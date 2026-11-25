@@ -886,6 +886,18 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
       const today = Math.floor(Date.now() / 86400000) * 86400000;
       let hi = isFinite(amt) ? amt : NaN, lo = hi;
       if (t && t.t === today) { hi = isFinite(hi) ? Math.max(hi, t.hi) : t.hi; lo = isFinite(lo) ? Math.min(lo, t.lo) : t.lo; }
+      // Gün içinde görülen canlı değerleri sakla ki en yüksek ve en düşük geri gitmesin
+      if (isFinite(amt)) {
+        const sig = state.active + "|" + cur + "|" + state.lots.map(l => l.coinId + ":" + l.amount).join(",");
+        let trk = {};
+        try { trk = JSON.parse(localStorage.getItem("kripto-gunici") || "{}"); } catch (e) {}
+        if (trk.day !== today) trk = { day: today, v: {} };
+        const o = trk.v[sig] || { hi: amt, lo: amt };
+        o.hi = Math.max(o.hi, amt); o.lo = Math.min(o.lo, amt);
+        trk.v[sig] = o;
+        try { localStorage.setItem("kripto-gunici", JSON.stringify(trk)); } catch (e) {}
+        hi = Math.max(hi, o.hi); lo = Math.min(lo, o.lo);
+      }
       $("dayHi").textContent = isFinite(hi) ? fmtWholeAmt(hi, cur) : "–";
       $("dayHi").className = "sens " + (isFinite(hi) ? cls(hi) : "");
       $("dayLo").textContent = isFinite(lo) ? fmtWholeAmt(lo, cur) : "–";
