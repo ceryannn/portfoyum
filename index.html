@@ -425,6 +425,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   let state = load();
   let prices = {};          // { coinId: {usd, try, usd_24h_change} }
   let usdTry = null;        // 1 USD kaç TL
+  let srvHL = null;         // sunucunun 5 dakikada bir tuttugu gun ici kaydi
   // Değişim dönemleri
   const PERIODS = [
     { key: "1h",   label: "1 saat",  short: "1s" },
@@ -487,7 +488,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
   async function api(op, data) {
     if (!apiKey) throw new Error("key");
-    if (GAS) return op === "load" ? gs("loadData", apiKey) : gs("saveData", data, apiKey);
+    if (GAS) return op === "load" ? gs("loadData", apiKey) : op === "extras" ? gs("getExtras", apiKey) : gs("saveData", data, apiKey);
     const r = await fetch(API_URL, { method: "POST", body: JSON.stringify({ api: op, key: apiKey, data }) });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || "hata");
@@ -897,6 +898,15 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
         trk.v[sig] = o;
         try { localStorage.setItem("kripto-gunici", JSON.stringify(trk)); } catch (e) {}
         hi = Math.max(hi, o.hi); lo = Math.min(lo, o.lo);
+        // sunucu kaydi (cihazlar kapaliyken de tutulur)
+        const sk = srvHL && srvHL.day === today && srvHL.pf && srvHL.pf[state.active + "|" + state.lots.map(l => l.coinId + ":" + l.amount).join(",")];
+        if (sk) {
+          const a = cur === "usd" ? sk.u : sk.t;
+          if (a && isFinite(a[0]) && isFinite(a[1])) { hi = Math.max(hi, a[0]); lo = Math.min(lo, a[1]); }
+          const mins = Math.round((Date.now() - sk.at) / 60000);
+          $("dayHL").title = "Gün içi en yüksek ve en düşük kâr/zarar. Sunucu kaydı: " + (mins <= 1 ? "az önce" : mins + " dk önce") + (mins > 30 ? " (gecikmiş)" : "");
+          $("dayHL").querySelector(".k").textContent = mins > 30 ? "Gün içi ⚠" : "Gün içi";
+        }
       }
       $("dayHi").textContent = isFinite(hi) ? fmtWholeAmt(hi, cur) : "–";
       $("dayHi").className = "sens " + (isFinite(hi) ? cls(hi) : "");
@@ -1629,7 +1639,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   loadTop();
   fetchPrices();
   // ---------- korku ve açgözlülük endeksi ----------
-  const FNG_TR = { "Extreme Fear": "Aşırı korku", "Fear": "Korku", "Neutral": "Nötr", "Greed": "Açgözlülük", "Extreme Greed": "Aşırı açgözlülük" };
+  const FNG_TR = { "extreme fear": "Aşırı korku", "fear": "Korku", "neutral": "Nötr", "greed": "Açgözlülük", "extreme greed": "Aşırı açgözlülük" };
   const fngColor = v => v < 25 ? "#ff5c5c" : v < 45 ? "#f39c12" : v < 56 ? "#f1c40f" : v < 76 ? "#a3d94c" : "#2ecc71";
   function drawFng(v, cls, prev) {
     const cx = 52, cy = 52, R = 44, segs = [[0, 25, "#ff5c5c"], [25, 45, "#f39c12"], [45, 56, "#f1c40f"], [56, 76, "#a3d94c"], [76, 100, "#2ecc71"]];
@@ -1643,9 +1653,23 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     $("fngSvg").innerHTML = g;
     $("fngVal").textContent = isFinite(v) ? v : "–";
     $("fngVal").style.color = isFinite(v) ? fngColor(v) : "";
-    $("fngCls").textContent = cls ? (FNG_TR[cls] || cls) + (isFinite(prev) && prev !== v ? " · dün " + prev : "") : "";
+    $("fngCls").textContent = cls ? (FNG_TR[String(cls).toLowerCase()] || cls) + (isFinite(prev) && prev !== v ? " · dün " + prev : "") : "";
+  }
+  async function fetchExtras() {
+    if (!CLOUD || !apiKey) return false;
+    try {
+      const x = await api("extras");
+      if (x && x.g) { srvHL = x.g; render(); }
+      if (x && x.fng && isFinite(x.fng.v)) {
+        drawFng(x.fng.v, x.fng.c, x.fng.p == null ? NaN : x.fng.p);
+        $("fngBox").title = "Kripto Korku ve Açgözlülük Endeksi (" + x.fng.src + ")";
+        return true;
+      }
+    } catch (e) {}
+    return false;
   }
   async function fetchFng() {
+    if (await fetchExtras()) return;
     try {
       const r = await fetch("https:/" + "/api.alternative.me/fng/?limit=2");
       const j = await r.json(), d = j.data || [];
@@ -1653,7 +1677,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     } catch (e) {}
   }
   drawFng(NaN, "");
-  fetchFng(); setInterval(fetchFng, 30 * 60000);
+  fetchFng(); setInterval(fetchFng, 5 * 60000);
 
   setInterval(fetchPrices, 30000);
   fetchWindows(); setInterval(fetchWindows, 5 * 60000);
