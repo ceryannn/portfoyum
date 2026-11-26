@@ -268,7 +268,7 @@
     </div>
     <div class="legend"><span><i class="sw sw-g"></i>Günü kârla kapattı</span><span><i class="sw sw-r"></i>Günü zararla kapattı</span><span><i class="sw sw-c"></i>Sıfır çizgisi</span></div>
     <div id="chartDay" class="chart"><div class="status chart-empty">Grafik yükleniyor…</div></div>
-    <div class="hint">Her mum bir gün (03:00 – 03:00): gövde o günün açılışından gün sonuna kadarki kâr/zarar, fitiller gün içinde görülen en yüksek ve en düşük seviye (yaklaşık). Son mum bugün, canlı.</div>
+    <div class="hint">Her mum bir gün (03:00 – 03:00): gövde o günün açılışından gün sonuna kadarki kâr/zarar, fitiller gün içindeki en yüksek ve en düşük seviye (dakikalık sunucu kaydından; kayıt olmayan günlerde son 3 ayın saatlik fiyatlarından yaklaşık). Son mum bugün, canlı.</div>
   </div>
 
   <div class="card tv-card"><div id="tvChart" class="tv-chart"></div></div>
@@ -426,6 +426,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   let prices = {};          // { coinId: {usd, try, usd_24h_change} }
   let usdTry = null;        // 1 USD kaç TL
   let srvHL = null;         // sunucunun 5 dakikada bir tuttugu gun ici kaydi
+  let srvArsiv = null;      // sunucunun gecmis gunler icin dakikalik en yuksek / en dusuk arsivi
   // Değişim dönemleri
   const PERIODS = [
     { key: "1h",   label: "1 saat",  short: "1s" },
@@ -508,7 +509,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   }
   function save() {
     syncActive();
-    if (refreshCoins()) { fetchPrices(); fetchWindows(); fetchHistory(); }
+    if (refreshCoins()) { fetchPrices(); fetchWindows(); fetchHistory(); fetchHourly(); }
     state.updatedAt = Date.now();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
     if (CLOUD) { cloudDirty = true; clearTimeout(cloudTimer); cloudTimer = setTimeout(pushCloud, 800); setSync("☁ Kaydediliyor…"); }
@@ -534,7 +535,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
         if (remote && Array.isArray(remote.lots) && (remote.updatedAt || 0) > (state.updatedAt || 0)) {
           state = migrate(Object.assign({ viewCur: "usd", manual: {} }, remote));
           try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
-          refreshCoins(); render(); fetchPrices(); fetchWindows(); fetchHistory();
+          refreshCoins(); render(); fetchPrices(); fetchWindows(); fetchHistory(); fetchHourly();
         } else if (first && (state.updatedAt || 0) > (remote.updatedAt || 0)) {
           pushCloud();
         }
@@ -1039,6 +1040,50 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     hit.addEventListener("touchmove", move, { passive: true }); hit.addEventListener("mouseleave", leave);
   }
   // ---------- günlük açılıştan gün sonu mum grafiği ----------
+  // Saatlik kapanislar (son 3 ay): gun ici en yuksek ve en dusuk icin
+  const hourly = {};
+  let hourlyBusy = false;
+  async function fetchHourly() {
+    if (hourlyBusy) return;
+    hourlyBusy = true;
+    try {
+      const from0 = Math.floor(Date.now() / 86400000) * 86400000 - 91 * 86400000;
+      const syms = tradable().map(c => c.symbol + "USDT").concat("USDTTRY");
+      for (const s of syms) {
+        const m = hourly[s] || (hourly[s] = new Map());
+        let start = from0;
+        if (m.size) { let mx = 0; for (const k of m.keys()) if (k > mx) mx = k; start = mx; }
+        for (let g = 0; g < 4; g++) {
+          let k;
+          try { k = await binanceGet(`/api/v3/klines?symbol=${s}&interval=1h&limit=1000&startTime=${start}`); } catch (e) { break; }
+          for (const r of k) m.set(r[0], [parseFloat(r[2]), parseFloat(r[3])]);
+          if (k.length < 1000) break;
+          start = k[k.length - 1][0] + 3600000;
+        }
+      }
+    } finally { hourlyBusy = false; }
+    drawDayChart();
+  }
+  // bir gun icin saatlik tepe ve dip fiyatlarla portfoy degerinin en yuksek ve en dusuk hali (mutlak)
+  function hourPath(t, cur, lots) {
+    const now = Date.now();
+    let hi = -Infinity, lo = Infinity, n = 0;
+    for (let i = 0; i < 24; i++) {
+      const ht = t + i * 3600000;
+      if (ht > now) break;
+      const f = cur === "try" ? (hourly.USDTTRY && hourly.USDTTRY.get(ht)) : [1, 1];
+      if (!f) return null;
+      let vh = 0, vl = 0;
+      for (const lot of lots) {
+        const r = lot.symbol === "USDT" ? [1, 1] : (hourly[lot.symbol + "USDT"] && hourly[lot.symbol + "USDT"].get(ht));
+        if (!r) return null;
+        vh += lot.amount * r[0] * f[0]; vl += lot.amount * r[1] * f[1];
+      }
+      hi = Math.max(hi, vh); lo = Math.min(lo, vl); n++;
+    }
+    return n ? [hi, lo] : null;
+  }
+
   function dayCandles(cur, days) {
     const ref = state.lots.map(l => daily[l.coinId]).filter(a => a && a.length).sort((a, b) => b.length - a.length)[0];
     if (!ref || !state.lots.length) return null;
@@ -1048,26 +1093,47 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     for (const [t] of ref.slice(-days)) {
       const dayEnd = t + DAY - 1;
       const fx = cur === "try" ? ((maps.USDTTRY && maps.USDTTRY.get(t)) || [0, usdTry])[1] : 1;
-      let o = 0, c = 0, h = 0, l = 0, held = false, missing = false;
+      let o = 0, c = 0, held = false, missing = false;
+      const inDay = [];
       for (const lot of state.lots) {
         if (lot.date && new Date(lot.date + "T00:00").getTime() > dayEnd) continue;
         held = true;
         const row = maps[lot.coinId] && maps[lot.coinId].get(t);
         if (!row || !isFinite(row[2])) { missing = true; continue; }
-        const q = lot.amount * fx, op = row[2], cl = row[1];
-        const hi = isFinite(row[3]) ? row[3] : Math.max(op, cl), lo = isFinite(row[4]) ? row[4] : Math.min(op, cl);
-        o += q * op; c += q * cl; h += q * hi; l += q * lo;
+        const q = lot.amount * fx;
+        o += q * row[2]; c += q * row[1];
+        inDay.push(lot);
       }
       if (!held || missing) continue;
+      // Gun ici yol: saatlik kapanislardan portfoy degeri (son 3 ay)
+      let h = NaN, l = NaN;
+      const hr = hourPath(t, cur, inDay);
+      if (hr) { h = hr[0]; l = hr[1]; }
       out.push({ t, o, c, h, l });
     }
     // son mum: canlı fiyatla bugün
     const today = Math.floor(Date.now() / DAY) * DAY, last = out[out.length - 1];
     if (last && last.t === today) {
       const live = summarize(cur).reduce((s, r) => s + r.value, 0);
-      if (isFinite(live)) { last.c = live; last.h = Math.max(last.h, live); last.l = Math.min(last.l, live); }
+      if (isFinite(live)) { last.c = live; if (isFinite(last.h)) { last.h = Math.max(last.h, live); last.l = Math.min(last.l, live); } }
+      // bugun icin sunucunun dakikalik kaydi daha dogru
+      const sk = srvHL && srvHL.day === today && srvHL.pf && srvHL.pf[state.active + "|" + state.lots.map(l => l.coinId + ":" + l.amount).join(",")];
+      const a = sk && (cur === "usd" ? sk.u : sk.t);
+      if (a && isFinite(a[0]) && isFinite(a[1])) { last.h = last.o + a[0]; last.l = last.o + a[1]; if (isFinite(live)) { last.h = Math.max(last.h, live); last.l = Math.min(last.l, live); } }
     }
-    return out.map(k => ({ t: k.t, d: k.c - k.o, hi: Math.max(0, k.h - k.o, k.c - k.o), lo: Math.min(0, k.l - k.o, k.c - k.o), pct: k.o ? (k.c / k.o - 1) * 100 : NaN, live: k.t === today }));
+    // gecmis gunler: sunucu arsivi (dakikalik, ayni portfoy icerigi icin) saatlik tahminden once gelir
+    const sig = state.lots.map(l => l.coinId + ":" + l.amount).join(",");
+    let hsig = 0;
+    for (let i = 0; i < sig.length; i++) hsig = (hsig * 31 + sig.charCodeAt(i)) % 1000000007;
+    hsig = String(hsig);
+    return out.map(k => {
+      const d = k.c - k.o, rec = srvArsiv && srvArsiv[k.t] && srvArsiv[k.t][state.active];
+      const ar = rec && rec.h === hsig && (cur === "usd" ? rec.u : rec.t);
+      let hi = NaN, lo = NaN;
+      if (ar && k.t !== today) { hi = Math.max(0, ar[0], d); lo = Math.min(0, ar[1], d); }
+      else if (isFinite(k.h) && isFinite(k.l)) { hi = Math.max(0, k.h - k.o, d); lo = Math.min(0, k.l - k.o, d); }
+      return { t: k.t, d, hi, lo, pct: k.o ? (k.c / k.o - 1) * 100 : NaN, live: k.t === today, exact: !!ar || k.t === today };
+    });
   }
 
   function drawDayChart() {
@@ -1079,7 +1145,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     }
     const W = Math.max(300, box.clientWidth), H = box.clientHeight || 280;
     const m = { l: 64, r: 16, t: 10, b: 26 };
-    const vals = pts.flatMap(p => [p.hi, p.lo]).concat(0);
+    const vals = pts.flatMap(p => [p.hi, p.lo, p.d]).filter(isFinite).concat(0);
     const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 4);
     const y0 = ticks[0], y1 = ticks[ticks.length - 1];
     const slot = (W - m.l - m.r) / pts.length;
@@ -1097,7 +1163,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     const candles = pts.map((p, i) => {
       const col = p.d >= 0 ? "#2ecc71" : "#ff5c5c", xi = x(i).toFixed(1);
       const top = Math.min(y(p.d), zy), hgt = Math.max(1, Math.abs(y(p.d) - zy));
-      const wick = slot >= 3 ? `<line x1="${xi}" x2="${xi}" y1="${y(p.hi).toFixed(1)}" y2="${y(p.lo).toFixed(1)}" stroke="${col}" stroke-width="1"/>` : "";
+      const wick = slot >= 3 && isFinite(p.hi) ? `<line x1="${xi}" x2="${xi}" y1="${y(p.hi).toFixed(1)}" y2="${y(p.lo).toFixed(1)}" stroke="${col}" stroke-width="1"/>` : "";
       return `${wick}<rect x="${(x(i) - bw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${hgt.toFixed(1)}" fill="${col}"${p.live ? ' fill-opacity=".55"' : ""} rx="${bw > 4 ? 1.5 : 0}"/>`;
     }).join("");
     box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Günlük açılıştan gün sonu kâr/zarar mum grafiği">
@@ -1116,8 +1182,8 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
       hb.style.display = ""; hb.setAttribute("x", xi - slot / 2); hb.setAttribute("width", slot);
       tip.innerHTML = `<b>${new Date(p.t).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "short" })}${p.live ? " (bugün, canlı)" : ""}</b>
         <div class="r"><span>Gün sonu</span><span class="${cls(p.d)}">${fmtMoney(p.d, cur, true)} (${fmtPct(p.pct)})</span></div>
-        <div class="r"><span>Gün içi en yüksek</span><span class="${cls(p.hi)}">${fmtMoney(p.hi, cur, true)}</span></div>
-        <div class="r"><span>Gün içi en düşük</span><span class="${cls(p.lo)}">${fmtMoney(p.lo, cur, true)}</span></div>`;
+        <div class="r"><span>Gün içi en yüksek</span><span class="${isFinite(p.hi) ? cls(p.hi) : ""}">${isFinite(p.hi) ? fmtMoney(p.hi, cur, true) : "–"}</span></div>
+        <div class="r"><span>Gün içi en düşük</span><span class="${isFinite(p.lo) ? cls(p.lo) : ""}">${isFinite(p.lo) ? fmtMoney(p.lo, cur, true) : "–"}</span></div>`;
       tip.style.display = "block";
       const sx = xi * r.width / W, tw = tip.offsetWidth;
       tip.style.left = Math.min(Math.max(0, sx + 12 + tw > r.width ? sx - tw - 12 : sx + 12), r.width - tw) + "px";
@@ -1659,6 +1725,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
     if (!CLOUD || !apiKey) return false;
     try {
       const x = await api("extras");
+      if (x && x.a) srvArsiv = x.a;
       if (x && x.g) { srvHL = x.g; render(); }
       if (x && x.fng && isFinite(x.fng.v)) {
         drawFng(x.fng.v, x.fng.c, x.fng.p == null ? NaN : x.fng.p);
@@ -1682,6 +1749,7 @@ window.addEventListener("error", e => { const el = document.getElementById("stat
   setInterval(fetchPrices, 30000);
   fetchWindows(); setInterval(fetchWindows, 5 * 60000);
   fetchHistory(); setInterval(fetchHistory, 60 * 60000);
+  fetchHourly(); setInterval(fetchHourly, 15 * 60000);
   // Ekran açık kalsın: önce tarayıcının Wake Lock özelliği; iPad/iPhone ya da desteklemeyen tarayıcılarda
   // görünmez, sessiz, tekrar eden küçük bir video ile ekran açık tutulur. Seçim bu cihazda hatırlanır.
   const NOSLEEP_MP4 = "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAZzbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAph0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAABAAAAAQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAAAAABAAAAAAIQbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAoAAAAUABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABu21pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAXtzdGJsAAAAt3N0c2QAAAAAAAAAAQAAAKdhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAABAAEABIAAAASAAAAAAAAAABFUxhdmM2MC4zMS4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP__AAAALWF2Y0MBQsAe_-EAFWdCwB7aewEQAAADABAAAAMAoPFi6gEABWjOA5yAAAAAEHBhc3AAAAABAAAAAQAAABRidHJ0AAAAAAAAC1AAAAtQAAAAGHN0dHMAAAAAAAAAAQAAAAoAAAgAAAAAFHN0c3MAAAAAAAAAAQAAAAEAAAAcc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAPHN0c3oAAAAAAAAAAAAAAAoAAAKDAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAACQAAAAkAAAAJAAAAOHN0Y28AAAAAAAAACgAABrgAAAlDAAAJVAAACWEAAAlyAAAJfwAACZAAAAmdAAAJrgAACb8AAAMFdHJhawAAAFx0a2hkAAAAAwAAAAAAAAAAAAAAAgAAAAAAAAfQAAAAAAAAAAAAAAABAQAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAJGVkdHMAAAAcZWxzdAAAAAAAAAABAAAH0AAABAAAAQAAAAACfW1kaWEAAAAgbWRoZAAAAAAAAAAAAAAAAAAAH0AAAEKAVcQAAAAAAC1oZGxyAAAAAAAAAABzb3VuAAAAAAAAAAAAAAAAU291bmRIYW5kbGVyAAAAAihtaW5mAAAAEHNtaGQAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAexzdGJsAAAAfnN0c2QAAAAAAAAAAQAAAG5tcDRhAAAAAAAAAAEAAAAAAAAAAAABABAAAAAAH0AAAAAAADZlc2RzAAAAAAOAgIAlAAIABICAgBdAFQAAAAAAH0AAAAE_BYCAgAUViFblAAaAgIABAgAAABRidHJ0AAAAAAAAH0AAAAE_AAAAIHN0dHMAAAAAAAAAAgAAABAAAAQAAAAAAQAAAoAAAAB8c3RzYwAAAAAAAAAJAAAAAQAAAAEAAAABAAAAAgAAAAIAAAABAAAABAAAAAEAAAABAAAABQAAAAIAAAABAAAABgAAAAEAAAABAAAABwAAAAIAAAABAAAACAAAAAEAAAABAAAACQAAAAIAAAABAAAACwAAAAEAAAABAAAAWHN0c3oAAAAAAAAAAAAAABEAAAAVAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAAAQAAAAEAAAABAAAADxzdGNvAAAAAAAAAAsAAAajAAAJOwAACUwAAAldAAAJagAACXsAAAmIAAAJmQAACaYAAAm3AAAJyAAAABpzZ3BkAQAAAHJvbGwAAAACAAAAAf__AAAAHHNiZ3AAAAAAcm9sbAAAAAEAAAARAAAAAQAAAGJ1ZHRhAAAAWm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXJhcHBsAAAAAAAAAAAAAAAALWlsc3QAAAAlqXRvbwAAAB1kYXRhAAAAAQAAAABMYXZmNjAuMTYuMTAwAAAACGZyZWUAAAMxbWRhdN4CAExhdmM2MC4zMS4xMDIAAjBADgAAAm0GBf__adxF6b3m2Ui3lizYINkj7u94MjY0IC0gY29yZSAxNjQgcjMxMDggMzFlMTlmOSAtIEguMjY0L01QRUctNCBBVkMgY29kZWMgLSBDb3B5bGVmdCAyMDAzLTIwMjMgLSBodHRwOi8vd3d3LnZpZGVvbGFuLm9yZy94MjY0Lmh0bWwgLSBvcHRpb25zOiBjYWJhYz0wIHJlZj0xIGRlYmxvY2s9MTowOjAgYW5hbHlzZT0weDE6MHgxIG1lPWhleCBzdWJtZT0yIHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTAgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0wIDh4OGRjdD0wIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PTAgdGhyZWFkcz0xIGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRlPTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9MCB3ZWlnaHRwPTAga2V5aW50PTI1MCBrZXlpbnRfbWluPTUgc2NlbmVjdXQ9NDAgaW50cmFfcmVmcmVzaD0wIHJjX2xvb2thaGVhZD0xMCByYz1jcmYgbWJ0cmVlPTEgY3JmPTQwLjAgcWNvbXA9MC42MCBxcG1pbj0wIHFwbWF4PTY5IHFwc3RlcD00IGlwX3JhdGlvPTEuNDAgYXE9MToxLjAwAIAAAAAOZYiEBH___w9FAAEEP4ABGCAHARggBwAAAAVBmiAR9QEYIAcBGCAHAAAABUGaQBH1ARggBwAAAAVBmmAR9QEYIAcBGCAHAAAABUGagBH1ARggBwAAAAVBmqAR9QEYIAcBGCAHAAAABUGawBH1ARggBwAAAAVBmuAR9QEYIAcBGCAHAAAABUGbABD1ARggBwEYIAcAAAAFQZsgP9QBGCAH";
